@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/menu_jump"
+        android:title="@string/menu_jump"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_fit"
+        android:title="@string/menu_fit_screen"
+        app:showAsAction="never">
+        <menu>
+            <item
+                android:id="@+id/menu_fit_screen"
+                android:title="@string/menu_fit_screen" />
+            <item
+                android:id="@+id/menu_fit_width"
+                android:title="@string/menu_fit_width" />
+            <item
+                android:id="@+id/menu_fit_height"
+                android:title="@string/menu_fit_height" />
+        </menu>
+    </item>
+    <item
+        android:id="@+id/menu_rotate"
+        android:title="@string/menu_rotate"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_bookmark"
+        android:title="@string/menu_bookmark_add"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_bookmark_list"
+        android:title="@string/menu_bookmark_list"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_pages"
+        android:title="@string/menu_pages"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_crop"
+        android:title="@string/menu_crop"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_two_page"
+        android:checkable="true"
+        android:title="@string/menu_two_page"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_dir"
+        android:title="@string/menu_reading_dir"
+        app:showAsAction="never">
+        <menu>
+            <item
+                android:id="@+id/menu_dir_ltr"
+                android:title="@string/reading_ltr" />
+            <item
+                android:id="@+id/menu_dir_rtl"
+                android:title="@string/reading_rtl" />
+        </menu>
+    </item>
+    <item
+        android:id="@+id/menu_page_mode"
+        android:title="@string/menu_page_mode"
+        app:showAsAction="never">
+        <menu>
+            <item
+                android:id="@+id/menu_mode_paged"
+                android:title="@string/page_mode_paged" />
+            <item
+                android:id="@+id/menu_mode_vertical"
+                android:title="@string/page_mode_vertical" />
+        </menu>
+    </item>
+    <item
+        android:id="@+id/menu_orientation"
+        android:title="@string/menu_orientation"
+        app:showAsAction="never">
+        <menu>
+            <item
+                android:id="@+id/menu_orient_default"
+                android:title="@string/orientation_default" />
+            <item
+                android:id="@+id/menu_orient_portrait"
+                android:title="@string/orientation_portrait" />
+            <item
+                android:id="@+id/menu_orient_landscape"
+                android:title="@string/orientation_landscape" />
+        </menu>
+    </item>
+
+    <item
+        android:id="@+id/menu_keep_on"
+        android:checkable="true"
+        android:title="@string/menu_keep_on"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_night"
+        android:checkable="true"
+        android:title="@string/menu_night"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_fullscreen"
+        android:checkable="true"
+        android:title="@string/menu_fullscreen"
+        app:showAsAction="never" />
+</menu>

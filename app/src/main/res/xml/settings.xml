@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory app:title="@string/pref_cat_general">
+        <ListPreference
+            app:defaultValue="system"
+            app:entries="@array/theme_entries"
+            app:entryValues="@array/theme_values"
+            app:key="pref_theme"
+            app:title="@string/pref_theme"
+            app:useSimpleSummaryProvider="true" />
+        <ListPreference
+            app:defaultValue="system"
+            app:entries="@array/locale_entries"
+            app:entryValues="@array/locale_values"
+            app:key="pref_locale"
+            app:title="@string/pref_language"
+            app:useSimpleSummaryProvider="true" />
+        <ListPreference
+            app:defaultValue="UTF-8"
+            app:entries="@array/charset_entries"
+            app:entryValues="@array/charset_values"
+            app:key="pref_charset"
+            app:title="@string/pref_charset"
+            app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="@string/pref_cat_reader">
+        <SwitchPreferenceCompat
+            app:defaultValue="true"
+            app:key="pref_fullscreen"
+            app:title="@string/pref_fullscreen" />
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:key="pref_keep_screen_on"
+            app:title="@string/pref_keep_on" />
+        <ListPreference
+            app:defaultValue="ltr"
+            app:entries="@array/reading_dir_entries"
+            app:entryValues="@array/reading_dir_values"
+            app:key="pref_reading_dir"
+            app:title="@string/pref_reading_dir"
+            app:useSimpleSummaryProvider="true" />
+        <ListPreference
+            app:defaultValue="paged"
+            app:entries="@array/page_mode_entries"
+            app:entryValues="@array/page_mode_values"
+            app:key="pref_page_mode"
+            app:title="@string/pref_page_mode"
+            app:useSimpleSummaryProvider="true" />
+        <SwitchPreferenceCompat
+            app:defaultValue="true"
+            app:key="pref_double_tap"
+            app:title="@string/pref_double_tap" />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="@string/pref_cat_list">
+        <SwitchPreferenceCompat
+            app:defaultValue="true"
+            app:key="pref_list_statusbar"
+            app:title="@string/pref_list_statusbar" />
+        <SwitchPreferenceCompat
+            app:defaultValue="true"
+            app:key="pref_list_pathview"
+            app:title="@string/pref_list_pathview" />
+        <SwitchPreferenceCompat
+            app:defaultValue="true"
+            app:key="pref_list_quickfab"
+            app:title="@string/pref_list_quickfab" />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="@string/pref_cat_cache">
+        <Preference
+            app:key="pref_clear_history"
+            app:title="@string/pref_clear_history" />
+        <Preference
+            app:key="pref_clear_bookmarks"
+            app:title="@string/pref_clear_bookmarks" />
+        <Preference
+            app:key="pref_reset"
+            app:title="@string/pref_reset" />
+    </PreferenceCategory>
+
+</PreferenceScreen>

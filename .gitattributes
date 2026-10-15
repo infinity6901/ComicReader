@@ -1,0 +1,16 @@
+# Normalize line endings; keep Unix scripts LF so they run on CI/Linux.
+* text=auto eol=lf
+gradlew text eol=lf
+*.bat text eol=crlf
+
+# Binary assets (never convert)
+*.jar binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.pdf binary
+*.cbz binary
+*.cbr binary
+*.cb7 binary
