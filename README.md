@@ -6,6 +6,10 @@ This is an **original implementation** built to match the *feature set* of a
 reference comic reader — not a copy of its code. No ads, no analytics, no
 in-app billing, and no network access.
 
+## Download
+
+Get the latest signed APK from the [**Releases**](https://github.com/infinity6901/ComicReader/releases/latest) page.
+
 ## Features
 
 ### File browser
