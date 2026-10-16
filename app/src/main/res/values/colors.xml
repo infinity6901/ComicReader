@@ -1,4 +1,68 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+
+    <!-- ================= Brand ================= -->
+    <color name="brand_indigo">#4F46E5</color>
+    <color name="brand_violet">#7C3AED</color>
+    <color name="brand_amber">#F59E0B</color>
+    <color name="brand_teal">#0D9488</color>
+
+    <!-- ================= Material 3 — light ================= -->
+    <color name="md_primary">#4F46E5</color>
+    <color name="md_on_primary">#FFFFFF</color>
+    <color name="md_primary_container">#E0E7FF</color>
+    <color name="md_on_primary_container">#1E1B4B</color>
+
+    <color name="md_secondary">#0D9488</color>
+    <color name="md_on_secondary">#FFFFFF</color>
+    <color name="md_secondary_container">#CCFBF1</color>
+    <color name="md_on_secondary_container">#042F2E</color>
+
+    <color name="md_tertiary">#D97706</color>
+    <color name="md_on_tertiary">#FFFFFF</color>
+    <color name="md_tertiary_container">#FEF3C7</color>
+    <color name="md_on_tertiary_container">#451A03</color>
+
+    <color name="md_error">#DC2626</color>
+    <color name="md_on_error">#FFFFFF</color>
+    <color name="md_error_container">#FEE2E2</color>
+    <color name="md_on_error_container">#450A0A</color>
+
+    <color name="md_background">#FBFAFF</color>
+    <color name="md_on_background">#1A1B22</color>
+
+    <color name="md_surface">#FBFAFF</color>
+    <color name="md_on_surface">#1A1B22</color>
+    <color name="md_surface_variant">#E2E0EC</color>
+    <color name="md_on_surface_variant">#47464F</color>
+
+    <color name="md_surface_container_lowest">#FFFFFF</color>
+    <color name="md_surface_container_low">#F5F3FB</color>
+    <color name="md_surface_container">#EFEDF6</color>
+    <color name="md_surface_container_high">#E9E7F0</color>
+    <color name="md_surface_container_highest">#E3E1EA</color>
+
+    <color name="md_outline">#787680</color>
+    <color name="md_outline_variant">#C8C5D0</color>
+
+    <color name="md_inverse_surface">#2F3038</color>
+    <color name="md_inverse_on_surface">#F1F0F7</color>
+    <color name="md_inverse_primary">#C0C1FF</color>
+
+    <color name="md_scrim">#000000</color>
+
+    <!-- ================= Semantic extras ================= -->
+    <!-- Reader is always pure black for maximum contrast, in both themes. -->
+    <color name="reader_bg">#FF000000</color>
+    <color name="reader_bar">#E6101014</color>
+    <color name="reader_scrim">#B3000000</color>
     <color name="night_overlay">#66000000</color>
+
+    <color name="reader_card">#F21C1B22</color>
+    <color name="reader_on_surface_dim">#B3FFFFFF</color>
+
+    <color name="star_active">#F59E0B</color>
+    <color name="badge_bg">#1F000000</color>
+    <color name="thumbnail_placeholder">#E9E7F0</color>
+
 </resources>

@@ -6,7 +6,6 @@ import android.util.LruCache
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.infinity.comicreader.R
@@ -28,7 +27,7 @@ class ThumbAdapter(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val cache = object : LruCache<Int, Bitmap>(100) {}
 
-    class Holder(val root: View, val image: ImageView, val label: TextView) :
+    class Holder(val root: View, val image: com.google.android.material.imageview.ShapeableImageView, val label: TextView) :
         RecyclerView.ViewHolder(root)
 
     override fun getItemCount(): Int = source.pageCount
@@ -36,12 +35,22 @@ class ThumbAdapter(
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_thumb, parent, false)
-        return Holder(view, view.findViewById(R.id.thumb_image), view.findViewById(R.id.thumb_label))
+        return Holder(
+            view,
+            view.findViewById(R.id.thumb_image),
+            view.findViewById(R.id.thumb_label)
+        )
     }
 
     override fun onBindViewHolder(holder: Holder, position: Int) {
         holder.label.text = (position + 1).toString()
-        holder.root.alpha = if (position == currentPage) 1f else 0.9f
+        val context = holder.itemView.context
+        if (position == currentPage) {
+            holder.image.strokeWidth = context.resources.displayMetrics.density * 2f
+            holder.image.strokeColor = androidx.core.content.ContextCompat.getColorStateList(context, R.color.md_primary)
+        } else {
+            holder.image.strokeWidth = 0f
+        }
         holder.root.setOnClickListener { onPick(holder.bindingAdapterPosition) }
 
         val cached = cache.get(position)

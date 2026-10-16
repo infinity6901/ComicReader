@@ -43,6 +43,19 @@ class PdfSource(file: File) : PageSource {
         }
     }
 
+    @Synchronized
+    override fun pageSize(index: Int): IntArray? {
+        if (index < 0 || index >= renderer.pageCount) return null
+        return runCatching {
+            val page = renderer.openPage(index)
+            try {
+                intArrayOf(page.width, page.height)
+            } finally {
+                page.close()
+            }
+        }.getOrNull()
+    }
+
     override fun close() {
         runCatching { renderer.close() }
         runCatching { pfd.close() }

@@ -40,7 +40,8 @@ class PagesActivity : AppCompatActivity() {
 
         val progress = findViewById<ProgressBar>(R.id.pages_progress)
         val recycler = findViewById<RecyclerView>(R.id.pages_recycler)
-        recycler.layoutManager = GridLayoutManager(this, 4)
+        val widthDp = resources.displayMetrics.widthPixels / resources.displayMetrics.density
+        recycler.layoutManager = GridLayoutManager(this, (widthDp / 110f).toInt().coerceIn(3, 6))
         progress.visibility = View.VISIBLE
 
         val prefs = Prefs(this)
@@ -50,6 +51,9 @@ class PagesActivity : AppCompatActivity() {
             }
             progress.visibility = View.GONE
             result.onSuccess { source ->
+                val f = File(path)
+                val dot = f.name.lastIndexOf('.')
+                toolbar.subtitle = if (dot > 0) f.name.substring(0, dot) else f.name
                 val a = ThumbAdapter(source, current) { page ->
                     setResult(RESULT_OK, Intent().putExtra(EXTRA_RESULT_PAGE, page))
                     finish()

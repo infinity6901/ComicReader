@@ -8,6 +8,7 @@
         android:title="@string/menu_search"
         app:actionViewClass="androidx.appcompat.widget.SearchView"
         app:showAsAction="ifRoom|collapseActionView" />
+
     <item
         android:id="@+id/menu_grid"
         android:title="@string/menu_grid"
@@ -17,22 +18,30 @@
         android:title="@string/menu_sort"
         app:showAsAction="never" />
     <item
+        android:id="@+id/menu_sort_dir"
+        android:title="@string/pref_sort_dir"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_columns"
+        android:title="@string/menu_columns"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_show_hidden"
+        android:checkable="true"
+        android:title="@string/menu_show_hidden"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_new_folder"
+        android:title="@string/menu_new_folder"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/menu_add_favorite"
         android:title="@string/menu_add_favorite"
         app:showAsAction="never" />
-
-    <group android:checkableBehavior="single">
-        <item
-            android:id="@+id/menu_browse"
-            android:checked="true"
-            android:title="@string/menu_browse" />
-        <item
-            android:id="@+id/menu_favorites"
-            android:title="@string/menu_favorites" />
-        <item
-            android:id="@+id/menu_history"
-            android:title="@string/menu_history" />
-    </group>
+    <item
+        android:id="@+id/menu_refresh"
+        android:title="@string/menu_refresh"
+        app:showAsAction="never" />
 
     <item
         android:id="@+id/menu_settings"

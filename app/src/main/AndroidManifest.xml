@@ -13,9 +13,10 @@
     <application
         android:name=".App"
         android:allowBackup="true"
-        android:icon="@drawable/ic_launcher"
+        android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:requestLegacyExternalStorage="true"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.ComicReader">
 
@@ -43,6 +44,8 @@
 
         <activity
             android:name=".ui.ViewerActivity"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.ComicReader.Viewer"
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|uiMode" />
 
         <activity
@@ -56,6 +59,7 @@
         <activity
             android:name=".ui.CropActivity"
             android:label="@string/crop_title"
+            android:theme="@style/Theme.ComicReader.Viewer"
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|uiMode" />
 
         <activity

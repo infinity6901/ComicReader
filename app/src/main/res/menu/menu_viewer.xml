@@ -3,45 +3,84 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
+        android:id="@+id/menu_bookmark"
+        android:icon="@drawable/ic_bookmark_border"
+        android:title="@string/menu_bookmark_add"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/menu_tune"
+        android:icon="@drawable/ic_tune"
+        android:title="@string/menu_reader_settings"
+        app:showAsAction="ifRoom" />
+
+    <item
         android:id="@+id/menu_jump"
         android:title="@string/menu_jump"
         app:showAsAction="never" />
-    <item
-        android:id="@+id/menu_fit"
-        android:title="@string/menu_fit_screen"
-        app:showAsAction="never">
-        <menu>
-            <item
-                android:id="@+id/menu_fit_screen"
-                android:title="@string/menu_fit_screen" />
-            <item
-                android:id="@+id/menu_fit_width"
-                android:title="@string/menu_fit_width" />
-            <item
-                android:id="@+id/menu_fit_height"
-                android:title="@string/menu_fit_height" />
-        </menu>
-    </item>
-    <item
-        android:id="@+id/menu_rotate"
-        android:title="@string/menu_rotate"
-        app:showAsAction="never" />
-    <item
-        android:id="@+id/menu_bookmark"
-        android:title="@string/menu_bookmark_add"
-        app:showAsAction="never" />
-    <item
-        android:id="@+id/menu_bookmark_list"
-        android:title="@string/menu_bookmark_list"
-        app:showAsAction="never" />
+
     <item
         android:id="@+id/menu_pages"
         android:title="@string/menu_pages"
         app:showAsAction="never" />
+
     <item
-        android:id="@+id/menu_crop"
-        android:title="@string/menu_crop"
-        app:showAsAction="never" />
+        android:id="@+id/menu_fit"
+        android:title="@string/menu_fit"
+        app:showAsAction="never">
+        <menu>
+            <group android:checkableBehavior="single">
+                <item
+                    android:id="@+id/menu_fit_screen"
+                    android:title="@string/menu_fit_screen" />
+                <item
+                    android:id="@+id/menu_fit_width"
+                    android:title="@string/menu_fit_width" />
+                <item
+                    android:id="@+id/menu_fit_height"
+                    android:title="@string/menu_fit_height" />
+                <item
+                    android:id="@+id/menu_fit_stretch"
+                    android:title="@string/menu_fit_stretch" />
+            </group>
+        </menu>
+    </item>
+
+    <item
+        android:id="@+id/menu_page_mode"
+        android:title="@string/menu_page_mode"
+        app:showAsAction="never">
+        <menu>
+            <group android:checkableBehavior="single">
+                <item
+                    android:id="@+id/menu_mode_paged"
+                    android:title="@string/page_mode_paged" />
+                <item
+                    android:id="@+id/menu_mode_vertical"
+                    android:title="@string/page_mode_vertical" />
+                <item
+                    android:id="@+id/menu_mode_longstrip"
+                    android:title="@string/page_mode_longstrip" />
+            </group>
+        </menu>
+    </item>
+
+    <item
+        android:id="@+id/menu_dir"
+        android:title="@string/menu_reading_dir"
+        app:showAsAction="never">
+        <menu>
+            <group android:checkableBehavior="single">
+                <item
+                    android:id="@+id/menu_dir_ltr"
+                    android:title="@string/reading_ltr" />
+                <item
+                    android:id="@+id/menu_dir_rtl"
+                    android:title="@string/reading_rtl" />
+            </group>
+        </menu>
+    </item>
+
     <item
         android:id="@+id/menu_two_page"
         android:checkable="true"
@@ -49,45 +88,81 @@
         app:showAsAction="never" />
 
     <item
-        android:id="@+id/menu_dir"
-        android:title="@string/menu_reading_dir"
+        android:id="@+id/menu_filters"
+        android:title="@string/menu_filters"
         app:showAsAction="never">
         <menu>
-            <item
-                android:id="@+id/menu_dir_ltr"
-                android:title="@string/reading_ltr" />
-            <item
-                android:id="@+id/menu_dir_rtl"
-                android:title="@string/reading_rtl" />
+            <group android:checkableBehavior="single">
+                <item
+                    android:id="@+id/menu_filter_none"
+                    android:title="@string/str_filter_none" />
+                <item
+                    android:id="@+id/menu_filter_invert"
+                    android:title="@string/str_filter_invert" />
+                <item
+                    android:id="@+id/menu_filter_grayscale"
+                    android:title="@string/str_filter_grayscale" />
+                <item
+                    android:id="@+id/menu_filter_contrast"
+                    android:title="@string/str_filter_contrast" />
+                <item
+                    android:id="@+id/menu_filter_sepia"
+                    android:title="@string/str_filter_sepia" />
+            </group>
         </menu>
     </item>
+
     <item
-        android:id="@+id/menu_page_mode"
-        android:title="@string/menu_page_mode"
-        app:showAsAction="never">
-        <menu>
-            <item
-                android:id="@+id/menu_mode_paged"
-                android:title="@string/page_mode_paged" />
-            <item
-                android:id="@+id/menu_mode_vertical"
-                android:title="@string/page_mode_vertical" />
-        </menu>
-    </item>
+        android:id="@+id/menu_brightness"
+        android:title="@string/menu_brightness"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_page_spacing"
+        android:title="@string/menu_page_spacing"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_prev_chapter"
+        android:title="@string/menu_prev_chapter"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_next_chapter"
+        android:title="@string/menu_next_chapter"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_bookmark_list"
+        android:title="@string/menu_bookmark_list"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_crop"
+        android:title="@string/menu_crop"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_rotate"
+        android:title="@string/menu_rotate"
+        app:showAsAction="never" />
+
     <item
         android:id="@+id/menu_orientation"
         android:title="@string/menu_orientation"
         app:showAsAction="never">
         <menu>
-            <item
-                android:id="@+id/menu_orient_default"
-                android:title="@string/orientation_default" />
-            <item
-                android:id="@+id/menu_orient_portrait"
-                android:title="@string/orientation_portrait" />
-            <item
-                android:id="@+id/menu_orient_landscape"
-                android:title="@string/orientation_landscape" />
+            <group android:checkableBehavior="single">
+                <item
+                    android:id="@+id/menu_orient_default"
+                    android:title="@string/orientation_default" />
+                <item
+                    android:id="@+id/menu_orient_portrait"
+                    android:title="@string/orientation_portrait" />
+                <item
+                    android:id="@+id/menu_orient_landscape"
+                    android:title="@string/orientation_landscape" />
+            </group>
         </menu>
     </item>
 
@@ -96,14 +171,17 @@
         android:checkable="true"
         android:title="@string/menu_keep_on"
         app:showAsAction="never" />
+
     <item
         android:id="@+id/menu_night"
         android:checkable="true"
         android:title="@string/menu_night"
         app:showAsAction="never" />
+
     <item
         android:id="@+id/menu_fullscreen"
         android:checkable="true"
         android:title="@string/menu_fullscreen"
         app:showAsAction="never" />
+
 </menu>

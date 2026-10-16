@@ -50,6 +50,14 @@ class SevenZipSource(file: File) : PageSource {
         }
     }
 
+    @Synchronized
+    override fun pageSize(index: Int): IntArray? {
+        if (index !in entries.indices) return null
+        return runCatching {
+            sz.getInputStream(entries[index]).use { BitmapUtils.boundsStream(it) }
+        }.getOrNull()
+    }
+
     override fun close() {
         runCatching { sz.close() }
     }

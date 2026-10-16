@@ -1,0 +1,17 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Page with panel gutters punched out (even-odd) -->
+    <path
+        android:fillColor="#FF000000"
+        android:fillType="evenOdd"
+        android:pathData="M39,22 h30 a9,9 0 0 1 9,9 v46 a9,9 0 0 1 -9,9 h-30 a9,9 0 0 1 -9,-9 v-46 a9,9 0 0 1 9,-9 z M38,42 h32 v3 h-32 z M38,60 h32 v3 h-32 z" />
+
+    <!-- Speech bubble -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M53,52 h22 a9,9 0 0 1 9,9 v4 a9,9 0 0 1 -9,9 h-11 l-8,8 v-8 h-3 a9,9 0 0 1 -9,-9 v-4 a9,9 0 0 1 9,-9 z" />
+</vector>

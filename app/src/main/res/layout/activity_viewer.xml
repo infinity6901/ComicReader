@@ -1,21 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/viewer_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/black">
+    android:background="@color/reader_bg">
 
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/viewer_pager"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:overScrollMode="never" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/viewer_vertical"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:overScrollMode="never"
         android:visibility="gone" />
+
+    <View
+        android:id="@+id/viewer_dim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/black"
+        android:alpha="0" />
 
     <View
         android:id="@+id/night_overlay"
@@ -29,8 +39,12 @@
         android:id="@+id/viewer_toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="#CC000000"
+        android:background="@drawable/bg_reader_top"
+        android:theme="@style/ThemeOverlay.ComicReader.Reader"
         app:navigationIcon="@drawable/ic_back"
+        app:navigationIconTint="@android:color/white"
+        app:popupTheme="@style/ThemeOverlay.ComicReader.Popup"
+        app:subtitleTextColor="@color/reader_on_surface_dim"
         app:titleTextColor="@android:color/white" />
 
     <LinearLayout
@@ -38,27 +52,187 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:background="#CC000000"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:padding="8dp">
+        android:layout_marginHorizontal="10dp"
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/bg_reader_bottom"
+        android:orientation="vertical"
+        android:paddingHorizontal="10dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="6dp">
 
-        <SeekBar
-            android:id="@+id/viewer_seek"
-            android:layout_width="0dp"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-        <TextView
-            android:id="@+id/viewer_page_text"
+            <TextView
+                android:id="@+id/viewer_chapter_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:maxWidth="96dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/reader_on_surface_dim"
+                android:textSize="11sp"
+                tools:text="Ch. 1044" />
+
+            <SeekBar
+                android:id="@+id/viewer_seek"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="8dp"
+                android:layout_weight="1"
+                android:paddingVertical="2dp" />
+
+            <TextView
+                android:id="@+id/viewer_page_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="end"
+                android:minWidth="@dimen/reader_indicator_min_w"
+                android:textColor="@android:color/white"
+                android:textSize="12sp"
+                tools:text="4 / 24" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <ImageButton
+                android:id="@+id/btn_prev_chapter"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/menu_prev_chapter"
+                android:padding="10dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_skip_previous"
+                app:tint="@android:color/white" />
+
+            <ImageButton
+                android:id="@+id/btn_prev_page"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/previous_page"
+                android:padding="10dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_chevron_left"
+                app:tint="@android:color/white" />
+
+            <ImageButton
+                android:id="@+id/btn_pages"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/menu_pages"
+                android:padding="10dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_grid_view"
+                app:tint="@android:color/white" />
+
+            <ImageButton
+                android:id="@+id/btn_next_page"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/next_page"
+                android:padding="10dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_chevron_right"
+                app:tint="@android:color/white" />
+
+            <ImageButton
+                android:id="@+id/btn_next_chapter"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/menu_next_chapter"
+                android:padding="10dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_skip_next"
+                app:tint="@android:color/white" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/viewer_end"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_margin="32dp"
+        android:visibility="gone"
+        app:cardBackgroundColor="@color/reader_card"
+        app:cardCornerRadius="@dimen/corner_lg"
+        app:cardElevation="0dp"
+        tools:visibility="visible">
+
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:minWidth="72dp"
-            android:textColor="@android:color/white"
-            android:textSize="13sp" />
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:padding="@dimen/space_6">
 
-    </LinearLayout>
+            <ImageView
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_check_circle"
+                app:tint="@color/star_active" />
+
+            <TextView
+                android:id="@+id/end_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_3"
+                android:text="@string/chapter_end_title"
+                android:textAppearance="@style/TextAppearance.ComicReader.ItemTitle"
+                android:textColor="@android:color/white" />
+
+            <TextView
+                android:id="@+id/end_subtitle"
+                android:layout_width="240dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_1"
+                android:gravity="center"
+                android:textColor="@color/reader_on_surface_dim"
+                android:textSize="13sp"
+                tools:text="You finished “Chapter 1044”." />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/end_next"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_4"
+                android:text="@string/open_next_chapter" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/end_prev"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/open_prev_chapter"
+                android:textColor="@color/reader_on_surface_dim" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/end_close"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/close"
+                android:textColor="@color/reader_on_surface_dim" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
 
     <ProgressBar
         android:id="@+id/viewer_progress"

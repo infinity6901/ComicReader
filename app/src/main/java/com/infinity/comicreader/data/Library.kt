@@ -4,7 +4,7 @@ import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Favorites, reading history and bookmarks, persisted as JSON in SharedPreferences. */
+/** Favorites, read marks, reading history and bookmarks, persisted as JSON in SharedPreferences. */
 class Library(context: Context) {
     private val sp = context.applicationContext.getSharedPreferences("library", Context.MODE_PRIVATE)
 
@@ -31,6 +31,32 @@ class Library(context: Context) {
 
     fun clearFavorites() = sp.edit().putString("favorites", "[]").apply()
 
+    // ---------------- read marks ----------------
+    fun readMarks(): MutableList<String> = readStringList("read")
+
+    fun isRead(path: String): Boolean = readMarks().contains(path)
+
+    /** Returns true when the path is now marked read. */
+    fun toggleRead(path: String): Boolean {
+        val list = readMarks()
+        val added = if (list.contains(path)) {
+            list.remove(path); false
+        } else {
+            list.add(0, path); true
+        }
+        writeStringList("read", list)
+        return added
+    }
+
+    fun setRead(path: String, read: Boolean) {
+        val list = readMarks()
+        if (read && !list.contains(path)) list.add(0, path)
+        if (!read) list.remove(path)
+        writeStringList("read", list)
+    }
+
+    fun clearRead() = sp.edit().putString("read", "[]").apply()
+
     // ---------------- history ----------------
     fun history(): MutableList<HistoryItem> {
         val arr = JSONArray(sp.getString("history", "[]"))
@@ -54,26 +80,15 @@ class Library(context: Context) {
         val list = ArrayList(history().filterNot { it.path == item.path })
         list.add(0, item)
         while (list.size > 200) list.removeAt(list.size - 1)
-        val arr = JSONArray()
-        list.forEach { h ->
-            arr.put(
-                JSONObject()
-                    .put("path", h.path).put("name", h.name)
-                    .put("page", h.page).put("total", h.total).put("time", h.time)
-            )
-        }
-        sp.edit().putString("history", arr.toString()).apply()
+        writeHistory(list)
     }
 
-    fun pageFor(path: String): Int = history().firstOrNull { it.path == path }?.page ?: 0
+    fun historyFor(path: String): HistoryItem? = history().firstOrNull { it.path == path }
+
+    fun pageFor(path: String): Int = historyFor(path)?.page ?: 0
 
     fun removeHistory(path: String) {
-        val arr = JSONArray()
-        history().filterNot { it.path == path }.forEach { h ->
-            arr.put(JSONObject().put("path", h.path).put("name", h.name)
-                .put("page", h.page).put("total", h.total).put("time", h.time))
-        }
-        sp.edit().putString("history", arr.toString()).apply()
+        writeHistory(history().filterNot { it.path == path })
     }
 
     fun clearHistory() = sp.edit().putString("history", "[]").apply()
@@ -126,6 +141,18 @@ class Library(context: Context) {
     private fun writeStringList(key: String, list: List<String>) {
         val arr = JSONArray(); list.forEach { arr.put(it) }
         sp.edit().putString(key, arr.toString()).apply()
+    }
+
+    private fun writeHistory(list: List<HistoryItem>) {
+        val arr = JSONArray()
+        list.forEach { h ->
+            arr.put(
+                JSONObject()
+                    .put("path", h.path).put("name", h.name)
+                    .put("page", h.page).put("total", h.total).put("time", h.time)
+            )
+        }
+        sp.edit().putString("history", arr.toString()).apply()
     }
 
     private fun writeBookmarks(list: List<Bookmark>) {

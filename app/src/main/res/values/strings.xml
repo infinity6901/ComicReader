@@ -4,10 +4,17 @@
     <string name="about">About</string>
     <string name="about_version_format">%1$s %2$s</string>
 
-    <!-- list screen -->
+    <!-- ===================== Bottom tabs ===================== -->
+    <string name="tab_browse">Browse</string>
+    <string name="tab_favorites">Favorites</string>
+    <string name="tab_history">History</string>
+    <string name="tab_bookmarks">Bookmarks</string>
+
+    <!-- ===================== List screen ===================== -->
     <string name="menu_browse">Browse</string>
     <string name="menu_favorites">Favorites</string>
     <string name="menu_history">History</string>
+    <string name="menu_bookmarks">Bookmarks</string>
     <string name="menu_search">Search</string>
     <string name="menu_sort">Sort</string>
     <string name="menu_grid">Grid view</string>
@@ -18,34 +25,62 @@
     <string name="menu_add_favorite">Add to favorites</string>
     <string name="menu_remove_favorite">Remove from favorites</string>
     <string name="menu_set_home">Set as home folder</string>
+    <string name="menu_open_location">Open file location</string>
+    <string name="menu_rename">Rename</string>
+    <string name="menu_refresh">Refresh</string>
+    <string name="menu_new_folder">New folder</string>
+    <string name="menu_show_hidden">Show hidden files</string>
+    <string name="menu_hide_hidden">Hide hidden files</string>
+    <string name="menu_columns">Grid columns</string>
+    <string name="menu_ascending">Ascending</string>
+    <string name="menu_descending">Descending</string>
+    <string name="menu_mark_read">Mark as read</string>
+    <string name="menu_mark_unread">Mark as unread</string>
+    <string name="menu_continue">Continue reading</string>
+    <string name="menu_select_all">Select all</string>
+    <string name="menu_clear_selection">Clear selection</string>
+    <string name="menu_delete_selected">Delete selected</string>
 
     <string name="empty_folder">Empty folder</string>
-    <string name="no_history">No history yet</string>
-    <string name="search_hint">Search…</string>
+    <string name="no_history">Nothing read yet</string>
+    <string name="no_favorites">No favorites yet</string>
+    <string name="no_bookmarks">No bookmarks yet</string>
+    <string name="empty_search">No matches</string>
+    <string name="search_hint">Search files…</string>
     <string name="error_open">Cannot open this file</string>
     <string name="grant_access">Grant access</string>
-    <string name="all_files_access">Please grant "All files access" so ComicReader can open folders anywhere.</string>
+    <string name="all_files_access">ComicReader needs access to all files to open comic folders anywhere on your device.</string>
+    <string name="open_settings">Open settings</string>
     <string name="page_indicator">%1$d / %2$d</string>
+    <string name="page_progress">%1$d of %2$d</string>
+    <string name="read_progress">%1$d / %2$d</string>
+    <string name="read_badge">Read</string>
+    <string name="new_badge">New</string>
+    <string name="books_count">%1$d items</string>
+    <string name="pages_count">%1$d pages</string>
+    <string name="page_number">Page %1$d</string>
+    <string name="percent_format">%1$d%%</string>
+    <string name="missing_file">Missing from storage</string>
+    <string name="folder_and_more">%1$s · %2$d items</string>
+    <string name="deleted_format">Deleted %1$d item(s)</string>
+    <string name="delete_confirm_title">Delete files?</string>
+    <string name="delete_confirm_msg">This permanently deletes the selected files from storage.</string>
+    <string name="renamed">Renamed</string>
+    <string name="rename_failed">Could not rename</string>
+    <string name="new_folder_hint">Folder name</string>
+    <string name="folder_created">Folder created</string>
+    <string name="home_set">Home folder updated</string>
+    <string name="open_location_failed">The file is no longer there</string>
 
-    <string-array name="sort_entries">
-        <item>Name</item>
-        <item>Size</item>
-        <item>Date</item>
-        <item>Type</item>
-    </string-array>
-    <string-array name="sort_values">
-        <item>name</item>
-        <item>size</item>
-        <item>date</item>
-        <item>type</item>
-    </string-array>
-
-    <!-- viewer -->
+    <!-- ===================== Viewer ===================== -->
+    <string name="menu_fit">Fit</string>
     <string name="menu_fit_screen">Fit screen</string>
     <string name="menu_fit_width">Fit width</string>
     <string name="menu_fit_height">Fit height</string>
+    <string name="menu_fit_stretch">Stretch</string>
     <string name="menu_rotate">Rotate</string>
     <string name="menu_bookmark_add">Add bookmark</string>
+    <string name="menu_bookmark_remove">Remove bookmark</string>
     <string name="menu_bookmark_list">Bookmark list</string>
     <string name="menu_keep_on">Keep screen on</string>
     <string name="menu_night">Night filter</string>
@@ -54,55 +89,153 @@
     <string name="menu_fullscreen">Fullscreen</string>
     <string name="menu_jump">Go to page…</string>
     <string name="menu_orientation">Orientation lock</string>
+    <string name="menu_next_chapter">Next chapter</string>
+    <string name="menu_prev_chapter">Previous chapter</string>
+    <string name="menu_reader_settings">Reader settings</string>
+    <string name="menu_filters">Page filter</string>
+    <string name="menu_tap_zones">Tap zones</string>
+    <string name="menu_page_spacing">Page spacing</string>
+    <string name="menu_brightness">Brightness</string>
+    <string name="menu_spread">Two-page spread</string>
+    <string name="menu_thumbnails">Page thumbnails</string>
+    <string name="menu_crop">Crop page</string>
+    <string name="menu_auto_crop">Auto-crop margins</string>
+
     <string name="reading_ltr">Left to right</string>
     <string name="reading_rtl">Right to left</string>
+    <string name="previous_page">Previous page</string>
+    <string name="next_page">Next page</string>
     <string name="page_mode_paged">Paged</string>
     <string name="page_mode_vertical">Vertical</string>
+    <string name="page_mode_longstrip">Long strip</string>
     <string name="orientation_default">System</string>
     <string name="orientation_portrait">Portrait</string>
     <string name="orientation_landscape">Landscape</string>
+
     <string name="bookmark_saved">Bookmark saved</string>
     <string name="bookmark_removed">Bookmark removed</string>
-    <string name="no_bookmarks">No bookmarks in this book</string>
+    <string name="no_bookmarks_in_book">No bookmarks in this book</string>
     <string name="jump_hint">Page number</string>
     <string name="ok">OK</string>
     <string name="cancel">Cancel</string>
     <string name="delete">Delete</string>
-    <string name="clear_history">Clear history</string>
+    <string name="clear">Clear</string>
+    <string name="close">Close</string>
+    <string name="save">Save</string>
+    <string name="apply">Apply</string>
 
-    <!-- crop / pages -->
-    <string name="crop_title">Crop</string>
+    <string name="chapter_end_title">End of chapter</string>
+    <string name="chapter_end_msg">You finished “%1$s”.</string>
+    <string name="open_next_chapter">Next chapter</string>
+    <string name="open_prev_chapter">Previous chapter</string>
+    <string name="no_next_chapter">No next chapter in this folder</string>
+    <string name="no_prev_chapter">No previous chapter in this folder</string>
+    <string name="finished_last_chapter">That was the last chapter in this folder</string>
+    <string name="opening_next_in">Opening next chapter…</string>
+
+    <string name="str_fit_screen">Fit screen</string>
+    <string name="str_filter_none">None</string>
+    <string name="str_filter_invert">Invert</string>
+    <string name="str_filter_grayscale">Grayscale</string>
+    <string name="str_filter_contrast">High contrast</string>
+    <string name="str_filter_sepia">Sepia</string>
+
+    <!-- ===================== Crop / pages ===================== -->
+    <string name="crop_title">Crop page</string>
     <string name="crop_save">Save</string>
     <string name="crop_rotate">Rotate</string>
     <string name="crop_saved">Saved: %1$s</string>
     <string name="crop_failed">Could not save the crop</string>
     <string name="pages_title">Pages</string>
     <string name="error_load">Could not load the page</string>
+    <string name="error_load_book">Could not open this book</string>
     <string name="menu_two_page">Two-page spread</string>
     <string name="menu_pages">Page thumbnails</string>
-    <string name="menu_crop">Crop page</string>
 
-    <!-- settings -->
+    <!-- ===================== Settings ===================== -->
     <string name="pref_cat_general">General</string>
+    <string name="pref_cat_appearance">Appearance</string>
     <string name="pref_cat_reader">Reader</string>
-    <string name="pref_cat_list">File list</string>
+    <string name="pref_cat_gestures">Gestures &amp; controls</string>
+    <string name="pref_cat_list">Library</string>
     <string name="pref_cat_cache">Storage &amp; cache</string>
+
     <string name="pref_theme">Theme</string>
+    <string name="pref_dynamic_color">Use system wallpaper colors</string>
     <string name="pref_language">Language</string>
     <string name="pref_charset">Archive filename charset</string>
+
     <string name="pref_fullscreen">Start in fullscreen</string>
-    <string name="pref_keep_on">Keep screen on while reading</string>
+    <string name="pref_keep_on">Keep the screen on while reading</string>
     <string name="pref_reading_dir">Default reading direction</string>
     <string name="pref_page_mode">Default page mode</string>
+    <string name="pref_fit">Default fit mode</string>
+    <string name="pref_filter">Default page filter</string>
+    <string name="pref_brightness">Default brightness</string>
+    <string name="pref_page_spacing">Page spacing</string>
+    <string name="pref_auto_next">Open the next chapter at the end</string>
+    <string name="pref_resume">Resume where I left off</string>
+    <string name="pref_two_page">Two-page spread</string>
+
+    <string name="pref_tap_zones">Enable tap zones</string>
+    <string name="pref_tap_zones_desc">Tap the left/right edges to turn pages</string>
+    <string name="pref_volume_keys">Use volume keys to turn pages</string>
+    <string name="pref_brightness_gesture">Swipe vertically to change brightness</string>
     <string name="pref_double_tap">Double-tap to zoom</string>
-    <string name="pref_list_statusbar">Show status bar in file list</string>
-    <string name="pref_list_pathview">Show path breadcrumb</string>
-    <string name="pref_list_quickfab">Show quick button</string>
+
+    <string name="pref_show_hidden">Show hidden files</string>
+    <string name="pref_thumbs">Show page thumbnails</string>
+    <string name="pref_grid">Use grid view</string>
+    <string name="pref_grid_columns">Grid columns</string>
+    <string name="pref_sort">Sort entries by</string>
+    <string name="pref_sort_dir">Sort direction</string>
+    <string name="pref_show_filenames">Show file names</string>
+    <string name="pref_list_pathview">Show path bar</string>
+    <string name="pref_list_statusbar">Show status bar in the library</string>
+    <string name="pref_list_quickfab">Show the list/grid button</string>
+
     <string name="pref_clear_history">Clear reading history</string>
     <string name="pref_clear_bookmarks">Clear all bookmarks</string>
+    <string name="pref_clear_thumbs">Clear thumbnail cache</string>
     <string name="pref_reset">Reset all settings</string>
     <string name="pref_reset_done">Settings were reset.</string>
     <string name="pref_cleared">Done.</string>
+    <string name="pref_cleared_thumbs">Thumbnail cache cleared.</string>
+
+    <string name="sort_name">Name</string>
+    <string name="sort_size">Size</string>
+    <string name="sort_date">Date</string>
+    <string name="sort_type">Type</string>
+
+    <!-- ===================== About ===================== -->
+    <string name="about_desc">A clean, private, ad-free comic &amp; PDF reader. Opens images, ZIP/CBZ, RAR/CBR, 7z/CB7 and PDF — entirely offline.</string>
+    <string name="about_credits">Archive support by junrar and Apache Commons Compress. PDF rendering via the Android platform PdfRenderer. Icons by Material Symbols.</string>
+    <string name="about_tagline">Read without the noise.</string>
+    <string name="about_license">Free and open source software, released under the MIT License.</string>
+    <string name="about_nightly">Version %1$s</string>
+
+    <!-- ===================== Arrays ===================== -->
+    <string-array name="sort_entries">
+        <item>@string/sort_name</item>
+        <item>@string/sort_size</item>
+        <item>@string/sort_date</item>
+        <item>@string/sort_type</item>
+    </string-array>
+    <string-array name="sort_values">
+        <item>name</item>
+        <item>size</item>
+        <item>date</item>
+        <item>type</item>
+    </string-array>
+
+    <string-array name="sort_dir_entries">
+        <item>@string/menu_ascending</item>
+        <item>@string/menu_descending</item>
+    </string-array>
+    <string-array name="sort_dir_values">
+        <item>asc</item>
+        <item>desc</item>
+    </string-array>
 
     <string-array name="theme_entries">
         <item>System</item>
@@ -114,20 +247,32 @@
         <item>light</item>
         <item>dark</item>
     </string-array>
+
     <string-array name="locale_entries">
         <item>System default</item>
         <item>English</item>
-        <item>한국어</item>
-        <item>日本語</item>
-        <item>Русский</item>
+        <item>Korean</item>
+        <item>Japanese</item>
+        <item>Chinese (Simplified)</item>
+        <item>Russian</item>
+        <item>Spanish</item>
+        <item>Portuguese</item>
+        <item>French</item>
+        <item>German</item>
     </string-array>
     <string-array name="locale_values">
         <item>system</item>
         <item>en</item>
         <item>ko</item>
         <item>ja</item>
+        <item>zh-CN</item>
         <item>ru</item>
+        <item>es</item>
+        <item>pt</item>
+        <item>fr</item>
+        <item>de</item>
     </string-array>
+
     <string-array name="charset_entries">
         <item>UTF-8</item>
         <item>CP949 (Korean)</item>
@@ -142,24 +287,84 @@
         <item>GBK</item>
         <item>windows-1251</item>
     </string-array>
+
     <string-array name="reading_dir_entries">
-        <item>Left to right</item>
-        <item>Right to left</item>
+        <item>@string/reading_ltr</item>
+        <item>@string/reading_rtl</item>
     </string-array>
     <string-array name="reading_dir_values">
         <item>ltr</item>
         <item>rtl</item>
     </string-array>
+
     <string-array name="page_mode_entries">
-        <item>Paged (horizontal)</item>
-        <item>Vertical (webtoon)</item>
+        <item>@string/page_mode_paged</item>
+        <item>@string/page_mode_vertical</item>
+        <item>@string/page_mode_longstrip</item>
     </string-array>
     <string-array name="page_mode_values">
         <item>paged</item>
         <item>vertical</item>
+        <item>longstrip</item>
     </string-array>
 
-    <!-- about -->
-    <string name="about_desc">A clean, ad-free comic and PDF reader. Supports images, ZIP/CBZ, RAR/CBR, 7z/CB7 and PDF.</string>
-    <string name="about_credits">Built from scratch. Archive support by junrar and Apache Commons Compress; PDF via the Android platform PdfRenderer.</string>
+    <string-array name="fit_entries">
+        <item>@string/menu_fit_screen</item>
+        <item>@string/menu_fit_width</item>
+        <item>@string/menu_fit_height</item>
+        <item>@string/menu_fit_stretch</item>
+    </string-array>
+    <string-array name="fit_values">
+        <item>screen</item>
+        <item>width</item>
+        <item>height</item>
+        <item>stretch</item>
+    </string-array>
+
+    <string-array name="orient_entries">
+        <item>@string/orientation_default</item>
+        <item>@string/orientation_portrait</item>
+        <item>@string/orientation_landscape</item>
+    </string-array>
+    <string-array name="orient_values">
+        <item>default</item>
+        <item>portrait</item>
+        <item>landscape</item>
+    </string-array>
+
+    <string-array name="filter_entries">
+        <item>@string/str_filter_none</item>
+        <item>@string/str_filter_invert</item>
+        <item>@string/str_filter_grayscale</item>
+        <item>@string/str_filter_contrast</item>
+        <item>@string/str_filter_sepia</item>
+    </string-array>
+    <string-array name="filter_values">
+        <item>none</item>
+        <item>invert</item>
+        <item>grayscale</item>
+        <item>contrast</item>
+        <item>sepia</item>
+    </string-array>
+
+    <string-array name="columns_entries">
+        <item>Auto</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+    </string-array>
+    <string-array name="columns_values">
+        <item>0</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+    </string-array>
 </resources>
+
+
+
+

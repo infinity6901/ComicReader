@@ -8,6 +8,7 @@ import androidx.preference.PreferenceFragmentCompat
 import com.infinity.comicreader.R
 import com.infinity.comicreader.data.Library
 import com.infinity.comicreader.data.Prefs
+import com.infinity.comicreader.data.Thumbs
 import com.infinity.comicreader.util.Locales
 
 class SettingsFragment : PreferenceFragmentCompat() {
@@ -45,9 +46,16 @@ class SettingsFragment : PreferenceFragmentCompat() {
             true
         }
 
+        findPreference<Preference>("pref_clear_thumbs")?.setOnPreferenceClickListener {
+            Thumbs.clear(requireContext())
+            toast(R.string.pref_cleared_thumbs)
+            true
+        }
+
         findPreference<Preference>("pref_reset")?.setOnPreferenceClickListener {
             prefs.reset()
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+            Locales.apply("system")
             toast(R.string.pref_reset_done)
             activity?.recreate()
             true

@@ -12,6 +12,10 @@ import androidx.appcompat.widget.AppCompatImageView
 /**
  * Image view with pinch-to-zoom, panning, double-tap zoom and configurable fit modes.
  * Uses [ScaleType.MATRIX] and manipulates the image matrix directly.
+ *
+ * [onTap] receives the tap position as a fraction of the view width so callers can
+ * implement left/centre/right tap zones. [onVerticalDrag] receives the vertical
+ * delta of a drag while the image is not zoomed (used for the brightness gesture).
  */
 class ZoomImageView @JvmOverloads constructor(
     context: Context,
@@ -19,18 +23,19 @@ class ZoomImageView @JvmOverloads constructor(
     defStyle: Int = 0
 ) : AppCompatImageView(context, attrs, defStyle) {
 
-    enum class FitMode { SCREEN, WIDTH, HEIGHT }
+    enum class FitMode { SCREEN, WIDTH, HEIGHT, STRETCH }
 
     private val matrix = Matrix()
     private val baseMatrix = Matrix()
     private var fitMode = FitMode.SCREEN
     private var minScale = 1f
     private var currentScale = 1f
-    private val maxScale = 8f
+    private var maxScale = 8f
     private var lastX = 0f
     private var lastY = 0f
 
-    var onTap: (() -> Unit)? = null
+    var onTap: ((Float) -> Unit)? = null
+    var onVerticalDrag: ((Float) -> Unit)? = null
     var doubleTapEnabled = true
 
     private val scaleDetector = ScaleGestureDetector(
@@ -56,6 +61,8 @@ class ZoomImageView @JvmOverloads constructor(
 
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
                 performClick()
+                val fraction = if (width > 0) e.x / width.toFloat() else 0.5f
+                onTap?.invoke(fraction)
                 return true
             }
 
@@ -101,10 +108,21 @@ class ZoomImageView @JvmOverloads constructor(
         val drawableH = drawable.intrinsicHeight.toFloat()
         if (drawableW <= 0f || drawableH <= 0f) return
 
+        if (mode == FitMode.STRETCH) {
+            baseMatrix.reset()
+            baseMatrix.postScale(viewW / drawableW, viewH / drawableH)
+            matrix.set(baseMatrix)
+            currentScale = 1f
+            minScale = 1f
+            maxScale = 1f
+            imageMatrix = matrix
+            return
+        }
+
         val scale = when (mode) {
-            FitMode.SCREEN -> minOf(viewW / drawableW, viewH / drawableH)
             FitMode.WIDTH -> viewW / drawableW
             FitMode.HEIGHT -> viewH / drawableH
+            else -> minOf(viewW / drawableW, viewH / drawableH)
         }
         baseMatrix.reset()
         baseMatrix.postScale(scale, scale)
@@ -115,6 +133,7 @@ class ZoomImageView @JvmOverloads constructor(
         matrix.set(baseMatrix)
         currentScale = scale
         minScale = scale
+        maxScale = scale * 8f
         imageMatrix = matrix
     }
 
@@ -160,7 +179,6 @@ class ZoomImageView @JvmOverloads constructor(
 
     override fun performClick(): Boolean {
         super.performClick()
-        onTap?.invoke()
         return true
     }
 
@@ -168,22 +186,25 @@ class ZoomImageView @JvmOverloads constructor(
         scaleDetector.onTouchEvent(event)
         gestureDetector.onTouchEvent(event)
 
+        val zoomed = currentScale > minScale * 1.01f
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 lastX = event.x
                 lastY = event.y
-                parent?.requestDisallowInterceptTouchEvent(currentScale > minScale * 1.01f)
+                parent?.requestDisallowInterceptTouchEvent(zoomed)
             }
             MotionEvent.ACTION_MOVE -> {
-                if (!scaleDetector.isInProgress && event.pointerCount == 1 &&
-                    currentScale > minScale * 1.01f
-                ) {
-                    val dx = event.x - lastX
-                    val dy = event.y - lastY
-                    matrix.postTranslate(dx, dy)
-                    clamp()
-                    imageMatrix = matrix
-                    parent?.requestDisallowInterceptTouchEvent(true)
+                if (!scaleDetector.isInProgress && event.pointerCount == 1) {
+                    if (zoomed) {
+                        val dx = event.x - lastX
+                        val dy = event.y - lastY
+                        matrix.postTranslate(dx, dy)
+                        clamp()
+                        imageMatrix = matrix
+                        parent?.requestDisallowInterceptTouchEvent(true)
+                    } else {
+                        onVerticalDrag?.invoke(event.y - lastY)
+                    }
                 }
                 lastX = event.x
                 lastY = event.y

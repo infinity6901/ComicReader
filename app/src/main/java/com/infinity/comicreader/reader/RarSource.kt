@@ -39,6 +39,14 @@ class RarSource(file: File) : PageSource {
         }
     }
 
+    @Synchronized
+    override fun pageSize(index: Int): IntArray? {
+        if (index !in headers.indices) return null
+        return runCatching {
+            archive.getInputStream(headers[index]).use { BitmapUtils.boundsStream(it) }
+        }.getOrNull()
+    }
+
     override fun close() {
         runCatching { archive.close() }
     }

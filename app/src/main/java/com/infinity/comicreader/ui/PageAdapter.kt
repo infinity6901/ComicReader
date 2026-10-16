@@ -1,12 +1,15 @@
 ﻿package com.infinity.comicreader.ui
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.util.Log
 import android.util.LruCache
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import androidx.recyclerview.widget.RecyclerView
+import com.infinity.comicreader.reader.Filters
 import com.infinity.comicreader.reader.PageSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -18,20 +21,36 @@ import kotlinx.coroutines.withContext
 /**
  * Renders [PageSource] pages into zoomable images.
  *
- * Works both as the adapter for a horizontal ViewPager2 (paged mode) and a
- * vertical RecyclerView (webtoon mode). When [twoPage] is set each item shows a
- * landscape spread of two pages.
+ * Three layouts share one adapter:
+ *  - [Mode.PAGED]     horizontal [androidx.viewpager2.widget.ViewPager2], one page
+ *                     (or a two-page spread) at a time;
+ *  - [Mode.VERTICAL]  vertical list, one full-height page per screen;
+ *  - [Mode.LONG_STRIP] continuous vertical strip sized from each page's aspect
+ *                     ratio with no gaps, as used by webtoons/manhwa.
  *
- * The adapter is always created for a fixed item layout, so callers must build a
- * new instance when toggling [twoPage] or [rtl].
+ * A [RecyclerView.Adapter] has a fixed item view type, so callers build a fresh
+ * instance whenever the mode, spread or reading direction changes.
  */
 class PageAdapter(
     private val source: PageSource,
-    private val onPageTap: () -> Unit,
+    private val mode: Mode,
+    private val onTap: (Float) -> Unit,
     private val doubleTapZoom: Boolean,
     private val twoPage: Boolean = false,
-    private val rtl: Boolean = false
+    private val rtl: Boolean = false,
+    private val onVerticalDrag: ((Float) -> Unit)? = null
 ) : RecyclerView.Adapter<PageAdapter.PageHolder>() {
+
+    enum class Mode { PAGED, VERTICAL, LONG_STRIP }
+
+    /** Margin between pages; ignored for long strips, which must be contiguous. */
+    var spacingPx: Int = 0
+        set(value) {
+            if (field != value) {
+                field = value
+                notifyItemRangeChanged(0, itemCount)
+            }
+        }
 
     var fitMode: ZoomImageView.FitMode = ZoomImageView.FitMode.SCREEN
         set(value) {
@@ -39,48 +58,92 @@ class PageAdapter(
             notifyItemRangeChanged(0, itemCount)
         }
 
+    var filter: String = Filters.NONE
+        set(value) {
+            field = value
+            notifyItemRangeChanged(0, itemCount)
+        }
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val cache = object : LruCache<String, Bitmap>(6) {}
+    private val aspects = HashMap<Int, Float>()
+    private var learnedAspect = 1.45f
+    private var recyclerWidth = 0
+    private var fallbackWidth = 1080
+    private var layoutListener: View.OnLayoutChangeListener? = null
+
+    private val spread = twoPage && mode == Mode.PAGED
 
     inner class PageHolder(val container: View, val images: List<ZoomImageView>) :
         RecyclerView.ViewHolder(container)
 
-    override fun getItemCount(): Int =
-        if (twoPage) (source.pageCount + 1) / 2 else source.pageCount
+    override fun getItemCount(): Int = if (spread) (source.pageCount + 1) / 2 else source.pageCount
+
+    override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
+        super.onAttachedToRecyclerView(recyclerView)
+        recyclerWidth = recyclerView.width
+        val listener = View.OnLayoutChangeListener { v, left, _, right, _, _, _, _, _ ->
+            val width = right - left
+            if (width > 0 && width != recyclerWidth) {
+                recyclerWidth = width
+                if (mode == Mode.LONG_STRIP) notifyItemRangeChanged(0, itemCount)
+            }
+            if (v.width > 0) fallbackWidth = v.width
+        }
+        layoutListener = listener
+        recyclerView.addOnLayoutChangeListener(listener)
+        if (mode == Mode.LONG_STRIP) learnAspect()
+    }
+
+    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+        super.onDetachedFromRecyclerView(recyclerView)
+        layoutListener?.let { recyclerView.removeOnLayoutChangeListener(it) }
+        layoutListener = null
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PageHolder {
-        if (twoPage) {
-            val row = LinearLayout(parent.context).apply {
+        val context = parent.context
+        if (parent.width > 0) fallbackWidth = parent.width
+        if (spread) {
+            val row = LinearLayout(context).apply {
                 orientation = LinearLayout.HORIZONTAL
-                layoutParams = ViewGroup.LayoutParams(
+                layoutParams = RecyclerView.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
             }
-            val left = makeImage(parent)
-            val right = makeImage(parent)
+            val left = makeImage(context)
+            val right = makeImage(context)
             row.addView(left, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
             row.addView(right, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
             return PageHolder(row, listOf(left, right))
-        } else {
-            val image = makeImage(parent).apply {
-                layoutParams = ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT
-                )
-            }
-            return PageHolder(image, listOf(image))
         }
+        val container = FrameLayout(context).apply {
+            layoutParams = RecyclerView.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        }
+        val image = makeImage(context)
+        container.addView(
+            image,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        )
+        return PageHolder(container, listOf(image))
     }
 
-    private fun makeImage(parent: ViewGroup): ZoomImageView =
-        ZoomImageView(parent.context).apply {
-            doubleTapEnabled = doubleTapZoom
-            onTap = { onPageTap() }
-        }
+    private fun makeImage(context: Context): ZoomImageView = ZoomImageView(context).apply {
+        doubleTapEnabled = doubleTapZoom
+        onTap = { fraction -> this@PageAdapter.onTap(fraction) }
+        onVerticalDrag = this@PageAdapter.onVerticalDrag
+        colorFilter = Filters.colorFilter(this@PageAdapter.filter)
+    }
 
     override fun onBindViewHolder(holder: PageHolder, position: Int) {
-        if (twoPage) {
+        if (spread) {
             val firstPage = if (rtl) position * 2 + 1 else position * 2
             val secondPage = if (rtl) position * 2 else position * 2 + 1
             bindImage(holder, holder.images[0], firstPage)
@@ -95,6 +158,15 @@ class PageAdapter(
             image.setImageDrawable(null)
             return
         }
+        image.colorFilter = Filters.colorFilter(filter)
+
+        if (mode == Mode.LONG_STRIP) {
+            applyHeight(holder.container, longStripHeight(pageIndex))
+            holder.container.setPadding(0, 0, 0, 0)
+        } else if (holder.container is FrameLayout) {
+            holder.container.setPadding(spacingPx, spacingPx, spacingPx, spacingPx)
+        }
+
         val key = pageIndex.toString()
         val cached = cache.get(key)
         if (cached != null) {
@@ -104,10 +176,8 @@ class PageAdapter(
         }
         image.setImageDrawable(null)
 
-        val reqW = (image.width.takeIf { it > 0 } ?: 1080) * 2
-        val reqH = (image.height.takeIf { it > 0 } ?: 1920) * 2
+        val (reqW, reqH) = requestSize(image)
         val holderPosition = holder.bindingAdapterPosition
-
         scope.launch {
             val bitmap = withContext(Dispatchers.IO) {
                 try {
@@ -116,13 +186,58 @@ class PageAdapter(
                     Log.w(TAG, "Failed to load page $pageIndex", t)
                     null
                 }
+            } ?: return@launch
+
+            cache.put(key, bitmap)
+            if (holder.bindingAdapterPosition != holderPosition) return@launch
+            image.setImageBitmap(bitmap)
+            image.setFitMode(fitMode)
+
+            if (mode == Mode.LONG_STRIP && bitmap.width > 0) {
+                val real = bitmap.height.toFloat() / bitmap.width.toFloat()
+                aspects[pageIndex] = real
+                if (pageIndex == 0) learnedAspect = real
+                applyHeight(holder.container, longStripHeight(pageIndex))
             }
-            if (bitmap != null) {
-                cache.put(key, bitmap)
-                if (holder.bindingAdapterPosition == holderPosition) {
-                    image.setImageBitmap(bitmap)
-                    image.setFitMode(fitMode)
-                }
+        }
+    }
+
+    private fun applyHeight(container: View, height: Int) {
+        val lp = container.layoutParams
+        if (lp == null) {
+            container.layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, height)
+        } else if (lp.height != height) {
+            lp.height = height
+            container.layoutParams = lp
+        }
+    }
+
+    private fun longStripHeight(page: Int): Int {
+        val width = if (recyclerWidth > 0) recyclerWidth else fallbackWidth
+        val aspect = aspects[page] ?: learnedAspect
+        return (width * aspect).toInt().coerceAtLeast(1)
+    }
+
+    private fun requestSize(image: ZoomImageView): Pair<Int, Int> {
+        val viewW = (if (image.width > 0) image.width else fallbackWidth).coerceAtLeast(360)
+        val viewH = (if (image.height > 0) image.height else 1920).coerceAtLeast(360)
+        return when {
+            mode == Mode.LONG_STRIP || mode == Mode.VERTICAL -> viewW to 1
+            fitMode == ZoomImageView.FitMode.WIDTH -> viewW to 1
+            fitMode == ZoomImageView.FitMode.HEIGHT -> 1 to viewH
+            else -> viewW to viewH
+        }
+    }
+
+    private fun learnAspect() {
+        scope.launch {
+            val size = withContext(Dispatchers.IO) {
+                runCatching { source.pageSize(0) }.getOrNull()
+            }
+            if (size != null && size[0] > 0) {
+                learnedAspect = size[1].toFloat() / size[0].toFloat()
+                aspects[0] = learnedAspect
+                notifyItemRangeChanged(0, itemCount)
             }
         }
     }

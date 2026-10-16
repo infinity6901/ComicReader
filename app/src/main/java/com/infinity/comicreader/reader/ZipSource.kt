@@ -31,6 +31,13 @@ class ZipSource(file: File, charsetName: String) : PageSource {
         }
     }
 
+    override fun pageSize(index: Int): IntArray? {
+        if (index !in entries.indices) return null
+        return runCatching {
+            zip.getInputStream(entries[index]).use { BitmapUtils.boundsStream(it) }
+        }.getOrNull()
+    }
+
     override fun close() {
         runCatching { zip.close() }
     }

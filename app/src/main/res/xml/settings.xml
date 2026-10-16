@@ -25,6 +25,25 @@
             app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
 
+    <PreferenceCategory app:title="@string/pref_cat_appearance">
+        <SwitchPreferenceCompat
+            app:defaultValue="true"
+            app:key="pref_show_filenames"
+            app:title="@string/pref_show_filenames" />
+        <SwitchPreferenceCompat
+            app:defaultValue="true"
+            app:key="pref_list_pathview"
+            app:title="@string/pref_list_pathview" />
+        <SwitchPreferenceCompat
+            app:defaultValue="true"
+            app:key="pref_list_statusbar"
+            app:title="@string/pref_list_statusbar" />
+        <SwitchPreferenceCompat
+            app:defaultValue="true"
+            app:key="pref_list_quickfab"
+            app:title="@string/pref_list_quickfab" />
+    </PreferenceCategory>
+
     <PreferenceCategory app:title="@string/pref_cat_reader">
         <SwitchPreferenceCompat
             app:defaultValue="true"
@@ -34,6 +53,14 @@
             app:defaultValue="false"
             app:key="pref_keep_screen_on"
             app:title="@string/pref_keep_on" />
+        <SwitchPreferenceCompat
+            app:defaultValue="true"
+            app:key="pref_resume"
+            app:title="@string/pref_resume" />
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:key="pref_auto_next"
+            app:title="@string/pref_auto_next" />
         <ListPreference
             app:defaultValue="ltr"
             app:entries="@array/reading_dir_entries"
@@ -48,6 +75,52 @@
             app:key="pref_page_mode"
             app:title="@string/pref_page_mode"
             app:useSimpleSummaryProvider="true" />
+        <ListPreference
+            app:defaultValue="screen"
+            app:entries="@array/fit_entries"
+            app:entryValues="@array/fit_values"
+            app:key="pref_fit"
+            app:title="@string/pref_fit"
+            app:useSimpleSummaryProvider="true" />
+        <ListPreference
+            app:defaultValue="none"
+            app:entries="@array/filter_entries"
+            app:entryValues="@array/filter_values"
+            app:key="pref_filter"
+            app:title="@string/pref_filter"
+            app:useSimpleSummaryProvider="true" />
+        <SeekBarPreference
+            app:defaultValue="100"
+            app:key="pref_brightness"
+            app:min="20"
+            app:showSeekBarValue="true"
+            app:title="@string/pref_brightness" />
+        <SeekBarPreference
+            app:defaultValue="0"
+            app:key="pref_page_spacing"
+            app:min="0"
+            app:showSeekBarValue="true"
+            app:title="@string/pref_page_spacing" />
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:key="pref_two_page"
+            app:title="@string/pref_two_page" />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="@string/pref_cat_gestures">
+        <SwitchPreferenceCompat
+            app:defaultValue="true"
+            app:key="pref_tap_zones"
+            app:summary="@string/pref_tap_zones_desc"
+            app:title="@string/pref_tap_zones" />
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:key="pref_volume_keys"
+            app:title="@string/pref_volume_keys" />
+        <SwitchPreferenceCompat
+            app:defaultValue="true"
+            app:key="pref_brightness_gesture"
+            app:title="@string/pref_brightness_gesture" />
         <SwitchPreferenceCompat
             app:defaultValue="true"
             app:key="pref_double_tap"
@@ -56,20 +129,44 @@
 
     <PreferenceCategory app:title="@string/pref_cat_list">
         <SwitchPreferenceCompat
-            app:defaultValue="true"
-            app:key="pref_list_statusbar"
-            app:title="@string/pref_list_statusbar" />
+            app:defaultValue="false"
+            app:key="pref_show_hidden"
+            app:title="@string/pref_show_hidden" />
         <SwitchPreferenceCompat
             app:defaultValue="true"
-            app:key="pref_list_pathview"
-            app:title="@string/pref_list_pathview" />
+            app:key="pref_thumbs"
+            app:title="@string/pref_thumbs" />
         <SwitchPreferenceCompat
-            app:defaultValue="true"
-            app:key="pref_list_quickfab"
-            app:title="@string/pref_list_quickfab" />
+            app:defaultValue="false"
+            app:key="pref_grid"
+            app:title="@string/pref_grid" />
+        <ListPreference
+            app:defaultValue="0"
+            app:entries="@array/columns_entries"
+            app:entryValues="@array/columns_values"
+            app:key="pref_grid_columns"
+            app:title="@string/pref_grid_columns"
+            app:useSimpleSummaryProvider="true" />
+        <ListPreference
+            app:defaultValue="name"
+            app:entries="@array/sort_entries"
+            app:entryValues="@array/sort_values"
+            app:key="pref_sort"
+            app:title="@string/pref_sort"
+            app:useSimpleSummaryProvider="true" />
+        <ListPreference
+            app:defaultValue="asc"
+            app:entries="@array/sort_dir_entries"
+            app:entryValues="@array/sort_dir_values"
+            app:key="pref_sort_dir"
+            app:title="@string/pref_sort_dir"
+            app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
 
     <PreferenceCategory app:title="@string/pref_cat_cache">
+        <Preference
+            app:key="pref_clear_thumbs"
+            app:title="@string/pref_clear_thumbs" />
         <Preference
             app:key="pref_clear_history"
             app:title="@string/pref_clear_history" />

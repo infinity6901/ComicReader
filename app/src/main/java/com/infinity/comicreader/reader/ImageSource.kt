@@ -13,5 +13,7 @@ class ImageSource(private val file: File) : PageSource {
         BitmapUtils.decodeFile(file.absolutePath, reqWidth, reqHeight)
             ?: throw IOException("Could not decode image: ${file.name}")
 
+    override fun pageSize(index: Int): IntArray? = BitmapUtils.boundsFile(file.absolutePath)
+
     override fun close() {}
 }

@@ -4,6 +4,12 @@ import java.io.File
 
 enum class EntryType { FOLDER, IMAGE, ARCHIVE, PDF, OTHER }
 
+/**
+ * A single row in the library. [childCount] is used by folders, [pages] holds a
+ * known page count, [progressPage] the last read page (-1 when unknown) and the
+ * flags mirror the favorites / read-mark stores so the adapter can render badges
+ * without touching disk.
+ */
 data class BookEntry(
     val file: File,
     val name: String,
@@ -11,8 +17,15 @@ data class BookEntry(
     val type: EntryType,
     val size: Long,
     val lastModified: Long,
-    val childCount: Int = -1
-)
+    val childCount: Int = -1,
+    val pages: Int = -1,
+    val progressPage: Int = -1,
+    val favorite: Boolean = false,
+    val read: Boolean = false,
+    val subtitle: String? = null
+) {
+    val path: String get() = file.absolutePath
+}
 
 data class HistoryItem(
     val path: String,

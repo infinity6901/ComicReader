@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- ================= Shapes ================= -->
+    <style name="Shape.ComicReader.Small" parent="ShapeAppearance.Material3.Corner.Small">
+        <item name="cornerSize">@dimen/corner_sm</item>
+    </style>
+
+    <style name="Shape.ComicReader.Medium" parent="ShapeAppearance.Material3.Corner.Medium">
+        <item name="cornerSize">@dimen/corner_md</item>
+    </style>
+
+    <style name="Shape.ComicReader.Large" parent="ShapeAppearance.Material3.Corner.Large">
+        <item name="cornerSize">@dimen/corner_lg</item>
+    </style>
+
+    <style name="Shape.ComicReader.Thumb" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">@dimen/corner_sm</item>
+    </style>
+
+    <style name="Shape.ComicReader.Cover" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">@dimen/corner_md</item>
+    </style>
+
+    <!-- ================= Type ================= -->
+    <style name="TextAppearance.ComicReader.AppTitle" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textSize">20sp</item>
+    </style>
+
+    <style name="TextAppearance.ComicReader.ItemTitle" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textSize">15sp</item>
+    </style>
+
+    <style name="TextAppearance.ComicReader.ItemSubtitle" parent="TextAppearance.Material3.BodySmall">
+        <item name="android:textSize">12.5sp</item>
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+    </style>
+
+    <style name="TextAppearance.ComicReader.Label" parent="TextAppearance.Material3.LabelLarge">
+        <item name="android:textSize">12sp</item>
+        <item name="android:letterSpacing">0.03</item>
+    </style>
+
+    <style name="TextAppearance.ComicReader.Empty" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+    </style>
+
+    <!-- ================= Widgets ================= -->
+    <style name="Widget.ComicReader.Card" parent="Widget.Material3.CardView.Elevated">
+        <item name="cardCornerRadius">@dimen/corner_md</item>
+        <item name="cardElevation">0dp</item>
+        <item name="android:stateListAnimator">@null</item>
+        <item name="cardBackgroundColor">?attr/colorSurfaceContainerLow</item>
+    </style>
+
+    <style name="Widget.ComicReader.Toolbar" parent="Widget.Material3.Toolbar">
+        <item name="titleTextAppearance">@style/TextAppearance.ComicReader.AppTitle</item>
+        <item name="android:background">?attr/colorSurface</item>
+    </style>
+
+    <!-- ================= Reader chrome ================= -->
+    <!-- Always-dark overlay for the reader bars, whatever the app theme. -->
+    <style name="ThemeOverlay.ComicReader.Reader" parent="ThemeOverlay.Material3.Dark">
+        <item name="colorOnSurface">@android:color/white</item>
+        <item name="colorOnSurfaceVariant">@color/reader_on_surface_dim</item>
+        <item name="colorControlNormal">@android:color/white</item>
+        <item name="colorPrimary">@color/md_primary_container</item>
+    </style>
+
+    <!-- The reader overflow menu follows the app's day/night setting. -->
+    <style name="ThemeOverlay.ComicReader.Popup" parent="ThemeOverlay.Material3.Light" />
+
+</resources>

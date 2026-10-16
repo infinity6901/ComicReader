@@ -13,4 +13,11 @@ interface PageSource : Closeable {
      * Implementations may return a smaller image; callers must not assume exact size.
      */
     fun loadPage(index: Int, reqWidth: Int, reqHeight: Int): Bitmap
+
+    /**
+     * Intrinsic `[width, height]` of page [index] without decoding its pixels, or
+     * null when it cannot be determined cheaply. Used to lay out continuous long
+     * strips so pages do not resize as they load.
+     */
+    fun pageSize(index: Int): IntArray? = null
 }
