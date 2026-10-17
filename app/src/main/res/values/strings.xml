@@ -83,6 +83,8 @@
     <string name="folder_created">Folder created</string>
     <string name="home_set">Home folder updated</string>
     <string name="open_location_failed">The file is no longer there</string>
+    <string name="recent">Recent</string>
+    <string name="recent_desc">Go to the folder of the last chapter you read</string>
 
     <!-- ===================== Viewer ===================== -->
     <string name="menu_fit">Fit</string>
@@ -111,8 +113,18 @@
     <string name="menu_auto_crop">Auto-crop margins</string>
     <string name="menu_chapters">Chapter list…</string>
     <string name="menu_auto_scroll">Auto-scroll</string>
+    <string name="menu_auto_next">Auto next chapter</string>
     <string name="menu_auto_speed">Auto-scroll speed…</string>
+    <string name="menu_group_display">Display</string>
+    <string name="menu_group_reading">Reading</string>
+    <string name="menu_group_page">Page actions</string>
+    <string name="menu_group_view">View</string>
+    <string name="menu_group_tools">Tools</string>
+    <string name="resume_progress">Page %1$d of %2$d · %3$d%%</string>
+    <string name="resume_page">Resume page</string>
+    <string name="first_page">First page</string>
     <string name="auto_speed_value">Auto-scroll speed: %1$d / 10</string>
+    <string name="auto_speed_short">%1$d / 10</string>
     <string name="menu_share_page">Share this page</string>
     <string name="menu_save_page">Save page to gallery</string>
     <string name="page_saved">Saved to Pictures/ComicReader</string>
@@ -188,8 +200,11 @@
     <string name="pref_filter">Default page filter</string>
     <string name="pref_brightness">Default brightness</string>
     <string name="pref_page_spacing">Page spacing</string>
-    <string name="pref_auto_next">Open the next chapter at the end</string>
+    <string name="pref_auto_next">Auto next chapter</string>
+    <string name="pref_auto_next_desc">Open the next chapter automatically when a chapter ends, without the end-of-chapter prompt</string>
     <string name="pref_resume">Resume where I left off</string>
+    <string name="pref_ask_resume">Ask where to start</string>
+    <string name="pref_ask_resume_desc">Ask whether to resume or start from the first page when a chapter has saved progress</string>
     <string name="pref_two_page">Two-page spread</string>
 
     <string name="pref_tap_zones">Enable tap zones</string>

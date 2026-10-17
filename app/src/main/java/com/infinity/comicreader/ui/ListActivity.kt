@@ -275,6 +275,17 @@ class ListActivity : AppCompatActivity() {
 
     private fun snapshot() = Snapshot(library.favoriteSet(), library.readSet(), library.historyMap())
 
+    /** A folder's path relative to the shared storage root, e.g. "Comics/One Piece". */
+    private fun relativePath(dir: File): String {
+        val root = Environment.getExternalStorageDirectory().absolutePath
+        val path = dir.absolutePath
+        return when {
+            path == root -> ""
+            path.startsWith("$root/") -> path.removePrefix("$root/")
+            else -> path
+        }
+    }
+
     /** Items a user would see inside [dir]: sub-folders and openable files, minus hidden ones. */
     private fun visibleChildren(dir: File): List<File> {
         val showHidden = prefs.showHidden
@@ -377,6 +388,9 @@ class ListActivity : AppCompatActivity() {
     private fun entryForHistory(item: HistoryItem, snap: Snapshot): BookEntry {
         val file = File(item.path)
         val exists = file.exists()
+        // Chapters are usually just "Chapter 12.cbz", so the folder below the name is
+        // what tells two chapters from different comics apart.
+        val where = file.parentFile?.let { relativePath(it) }
         return BookEntry(
             file = file,
             name = item.name,
@@ -388,7 +402,11 @@ class ListActivity : AppCompatActivity() {
             progressPage = item.page,
             favorite = item.path in snap.favorites,
             read = item.path in snap.read,
-            subtitle = if (!exists) getString(R.string.missing_file) else null
+            subtitle = when {
+                !exists -> getString(R.string.missing_file)
+                where != null && where.isNotEmpty() -> where
+                else -> null
+            }
         )
     }
 
@@ -439,8 +457,30 @@ class ListActivity : AppCompatActivity() {
         shown.clear()
         shown.addAll(filtered.sortedWith(comparator))
         adapter.submit(shown)
+        updateRecentHeader()
         updateEmptyState()
         updateFabIcon()
+    }
+
+    /**
+     * Keeps a "Recent" row at the top of the browse list, pointing at the folder of
+     * the last chapter that was read. Chapters are almost always just numbered, so
+     * the folder name is what identifies the series — and tapping the row jumps
+     * straight back to it.
+     */
+    private fun updateRecentHeader() {
+        val show = mode == TAB_BROWSE && query.isBlank() && shown.isNotEmpty()
+        val dir = if (show) library.history().firstOrNull()?.let { File(it.path).parentFile } else null
+        if (dir == null) {
+            adapter.header = null
+            return
+        }
+        adapter.header = BookAdapter.Header(
+            title = getString(R.string.recent),
+            subtitle = relativePath(dir).ifEmpty { dir.absolutePath },
+            iconRes = R.drawable.ic_history,
+            onClick = { loadDirectory(dir) }
+        )
     }
 
     private fun updateEmptyState() {
@@ -470,7 +510,8 @@ class ListActivity : AppCompatActivity() {
 
     private fun scrollToHighlight(path: String) {
         val index = shown.indexOfFirst { it.path == path }
-        if (index >= 0) recycler.scrollToPosition(index)
+        // The "Recent" row shifts every entry down by one position.
+        if (index >= 0) recycler.scrollToPosition(index + adapter.itemOffset)
     }
 
     private fun showProgress(visible: Boolean) {
@@ -493,9 +534,10 @@ class ListActivity : AppCompatActivity() {
                 else toast(R.string.open_location_failed)
             }
             Formats.isOpenable(entry.name) -> {
-                // "Resume where I left off" applies everywhere, but a finished book starts over.
-                val resume = prefs.resume && !library.isRead(entry.path)
-                openViewer(entry.file, if (resume) library.pageFor(entry.path) else 0)
+                // The reader decides where to start: the resume/first-page prompt when
+                // it is on, the saved page, or the first page for a finished book.
+                val page = if (library.isRead(entry.path)) 0 else -1
+                openViewer(entry.file, page)
             }
             else -> toast(R.string.error_open)
         }
@@ -572,7 +614,13 @@ class ListActivity : AppCompatActivity() {
 
     private fun applyLayoutManager() {
         recycler.layoutManager = if (prefs.listGrid) {
-            GridLayoutManager(this, columnCount())
+            GridLayoutManager(this, columnCount()).apply {
+                // The "Recent" row is not a grid cell: it spans the whole width.
+                spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
+                    override fun getSpanSize(position: Int): Int =
+                        if (position == 0 && adapter.header != null) spanCount else 1
+                }
+            }
         } else {
             LinearLayoutManager(this)
         }

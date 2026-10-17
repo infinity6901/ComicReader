@@ -39,7 +39,7 @@ class BookAdapter(
     private val onClick: (BookEntry) -> Unit,
     private val onLongClick: (BookEntry) -> Unit,
     private val onStarClick: (BookEntry) -> Unit
-) : RecyclerView.Adapter<BookAdapter.BookHolder>() {
+) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     private val items = ArrayList<BookEntry>()
     private val scope = CoroutineScope(SupervisorJob() + AppDispatchers.main)
@@ -49,6 +49,24 @@ class BookAdapter(
 
     /** Path to draw a focus ring around, used after "open file location". */
     var highlightPath: String? = null
+
+    /** Optional first row of the list — currently only the "Recent" shortcut. */
+    data class Header(
+        val title: String,
+        val subtitle: String,
+        val iconRes: Int,
+        val onClick: () -> Unit
+    )
+
+    /** A header occupies position 0, so every entry shifts down by this much. */
+    var header: Header? = null
+        set(value) {
+            if (field == value) return
+            field = value
+            notifyDataSetChanged()
+        }
+
+    val itemOffset: Int get() = if (header != null) 1 else 0
 
     fun submit(list: List<BookEntry>) {
         items.clear()
@@ -67,18 +85,44 @@ class BookAdapter(
         var job: Job? = null
     }
 
-    override fun getItemViewType(position: Int): Int = if (grid) 1 else 0
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): BookHolder {
-        val layout = if (viewType == 1) R.layout.item_book_grid else R.layout.item_book_list
-        val view = LayoutInflater.from(parent.context).inflate(layout, parent, false)
-        return BookHolder(view)
+    class HeaderHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val title: TextView = view.findViewById(R.id.title)
+        val subtitle: TextView = view.findViewById(R.id.subtitle)
+        val icon: ImageView = view.findViewById(R.id.placeholder)
+        val chevron: ImageView = view.findViewById(R.id.chevron)
     }
 
-    override fun getItemCount(): Int = items.size
+    override fun getItemViewType(position: Int): Int =
+        if (position == 0 && header != null) VIEW_HEADER else if (grid) VIEW_GRID else VIEW_LIST
 
-    override fun onBindViewHolder(holder: BookHolder, position: Int) {
-        val item = items[position]
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+        val context = parent.context
+        val layout = when (viewType) {
+            VIEW_HEADER -> R.layout.item_book_header
+            VIEW_GRID -> R.layout.item_book_grid
+            else -> R.layout.item_book_list
+        }
+        val view = LayoutInflater.from(context).inflate(layout, parent, false)
+        return if (viewType == VIEW_HEADER) HeaderHolder(view) else BookHolder(view)
+    }
+
+    override fun getItemCount(): Int = items.size + itemOffset
+
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+        if (holder is HeaderHolder) {
+            val h = header ?: return
+            holder.title.text = h.title
+            holder.subtitle.text = h.subtitle
+            holder.subtitle.visibility = if (h.subtitle.isEmpty()) View.GONE else View.VISIBLE
+            holder.icon.setImageResource(h.iconRes)
+            holder.itemView.setOnClickListener { h.onClick() }
+            return
+        }
+        bindBook(holder as BookHolder, items[position - itemOffset])
+    }
+
+    private fun bindBook(holder: BookHolder, item: BookEntry) {
+        val position = holder.absoluteAdapterPosition
         val context = holder.itemView.context
         holder.job?.cancel()
 
@@ -131,8 +175,9 @@ class BookAdapter(
         holder.itemView.setOnLongClickListener { onLongClick(item); true }
     }
 
-    override fun onViewRecycled(holder: BookHolder) {
+    override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
         super.onViewRecycled(holder)
+        if (holder !is BookHolder) return
         holder.job?.cancel()
         holder.job = null
         holder.thumb.setImageDrawable(null)
@@ -221,5 +266,8 @@ class BookAdapter(
 
     private companion object {
         const val THUMB_THREADS = 3
+        const val VIEW_LIST = 0
+        const val VIEW_GRID = 1
+        const val VIEW_HEADER = 2
     }
 }

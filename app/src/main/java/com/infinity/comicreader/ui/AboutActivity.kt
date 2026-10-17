@@ -17,7 +17,7 @@ class AboutActivity : AppCompatActivity() {
 
         val version = runCatching {
             packageManager.getPackageInfo(packageName, 0).versionName
-        }.getOrNull() ?: "1.0"
+        }.getOrNull() ?: "1.2"
 
         findViewById<TextView>(R.id.about_version).text =
             getString(R.string.about_version_format, getString(R.string.app_name), version)

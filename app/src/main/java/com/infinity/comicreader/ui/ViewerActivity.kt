@@ -14,6 +14,7 @@ import android.provider.MediaStore
 import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.EditText
@@ -57,6 +58,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.BitSet
+import kotlin.math.abs
 
 /**
  * The reader.
@@ -121,6 +123,9 @@ class ViewerActivity : AppCompatActivity() {
     private var autoScrolling = false
     private var autoRemainder = 0f
     private var autoLastFrame = 0L
+
+    /** Set when a chapter change should carry the running auto-scroll over. */
+    private var keepAutoScroll = false
 
     // reading statistics for the current session
     private var sessionStart = 0L
@@ -203,6 +208,11 @@ class ViewerActivity : AppCompatActivity() {
                 // Intentionally empty: the page is updated in onProgressChanged only.
             }
         })
+
+        // Neither paged nor strip mode can scroll past their last page, so a swipe in
+        // that direction is caught here: with auto next chapter on it rolls on.
+        (pager.getChildAt(0) as? RecyclerView)?.addOnItemTouchListener(overSwipeListener)
+        vertical.addOnItemTouchListener(overSwipeListener)
 
         btnPrevChapter = findViewById(R.id.btn_prev_chapter)
         btnNextChapter = findViewById(R.id.btn_next_chapter)
@@ -415,14 +425,36 @@ class ViewerActivity : AppCompatActivity() {
 
     private fun setup(src: PageSource) {
         val requested = intent.getIntExtra(EXTRA_PAGE, -1)
+        val saved = library.pageFor(file!!.absolutePath)
         val start = when {
             requested >= 0 -> requested
-            prefs.resume -> library.pageFor(file!!.absolutePath)
+            prefs.resume -> saved
             else -> 0
         }
         currentIndex = start.coerceIn(0, src.pageCount - 1)
         seenPages.clear()
         attach()
+
+        // Carrying an auto-scroll run into the next chapter must survive the reload.
+        if (keepAutoScroll) {
+            keepAutoScroll = false
+            startAutoScroll()
+        }
+
+        if (requested < 0 && prefs.askResume && saved in 1 until src.pageCount) {
+            askStartPage(saved, src.pageCount)
+        }
+    }
+
+    /** The resume / first-page choice offered when a chapter has saved progress. */
+    private fun askStartPage(saved: Int, count: Int) {
+        val percent = ((saved + 1) * 100f / count).toInt().coerceIn(1, 100)
+        AlertDialog.Builder(this)
+            .setTitle(chapterLabel(file!!))
+            .setMessage(getString(R.string.resume_progress, saved + 1, count, percent))
+            .setPositiveButton(R.string.resume_page) { _, _ -> goTo(saved) }
+            .setNegativeButton(R.string.first_page) { _, _ -> goTo(0) }
+            .show()
     }
 
     /**
@@ -570,6 +602,12 @@ class ViewerActivity : AppCompatActivity() {
 
     private fun updateEndCard() {
         val src = source ?: return
+        // "Auto next chapter" replaces the prompt entirely: the reader simply
+        // rolls into the next chapter when the user moves past the last page.
+        if (autoAdvance()) {
+            hideEndCard()
+            return
+        }
         val atEnd = when (mode) {
             MODE_LONGSTRIP -> !vertical.canScrollVertically(1)
             else -> currentIndex >= src.pageCount - 1
@@ -584,6 +622,7 @@ class ViewerActivity : AppCompatActivity() {
 
     private fun showEndCard() {
         val f = file ?: return
+        if (autoAdvance()) return
         endCard.visibility = View.VISIBLE
         endSubtitle.text = getString(R.string.chapter_end_msg, chapterLabel(f))
         endNext.visibility = if (nextChapter() != null) View.VISIBLE else View.GONE
@@ -817,6 +856,7 @@ class ViewerActivity : AppCompatActivity() {
             }
         )
         menu.findItem(R.id.menu_auto_scroll)?.isChecked = autoScrolling
+        menu.findItem(R.id.menu_auto_next)?.isChecked = prefs.autoNext
         menu.findItem(R.id.menu_auto_crop)?.apply {
             isChecked = autoCrop
             isEnabled = mode != MODE_LONGSTRIP
@@ -873,6 +913,7 @@ class ViewerActivity : AppCompatActivity() {
             R.id.menu_tune -> { showReaderSheet(); true }
             R.id.menu_chapters -> { showChapterList(); true }
             R.id.menu_auto_scroll -> { toggleAutoScroll(); true }
+            R.id.menu_auto_next -> { setAutoNext(!prefs.autoNext); true }
             R.id.menu_auto_speed -> { showAutoSpeedDialog(); true }
             R.id.menu_auto_crop -> { toggleAutoCrop(); true }
             R.id.menu_series -> { toggleSeries(); true }
@@ -968,6 +1009,8 @@ class ViewerActivity : AppCompatActivity() {
         bindDirectionSection(view)
         bindBrightnessSection(view)
         bindSpacingSection(view)
+        bindAutoScrollSection(view)
+        bindOrientationSection(view)
         bindToggleSection(view)
 
         view.findViewById<View>(R.id.sheet_more_settings).setOnClickListener {
@@ -1088,6 +1131,12 @@ class ViewerActivity : AppCompatActivity() {
             if (checked != twoPage) toggleTwoPage()
         }
 
+        val autoCropSwitch = view.findViewById<MaterialSwitch>(R.id.sheet_auto_crop)
+        autoCropSwitch.isChecked = autoCrop
+        autoCropSwitch.setOnCheckedChangeListener { _, checked ->
+            if (checked != autoCrop) setAutoCrop(checked)
+        }
+
         val nightSwitch = view.findViewById<MaterialSwitch>(R.id.sheet_night)
         nightSwitch.isChecked = nightFilter
         nightSwitch.setOnCheckedChangeListener { _, checked -> setNight(checked) }
@@ -1095,6 +1144,66 @@ class ViewerActivity : AppCompatActivity() {
         val keepSwitch = view.findViewById<MaterialSwitch>(R.id.sheet_keep_on)
         keepSwitch.isChecked = keepOn
         keepSwitch.setOnCheckedChangeListener { _, checked -> setKeepOn(checked) }
+
+        val fullscreenSwitch = view.findViewById<MaterialSwitch>(R.id.sheet_fullscreen)
+        fullscreenSwitch.isChecked = prefs.fullscreen
+        fullscreenSwitch.setOnCheckedChangeListener { _, checked -> setFullscreen(checked) }
+
+        val autoNextSwitch = view.findViewById<MaterialSwitch>(R.id.sheet_auto_next)
+        autoNextSwitch.isChecked = prefs.autoNext
+        autoNextSwitch.setOnCheckedChangeListener { _, checked -> setAutoNext(checked) }
+
+        val seriesSwitch = view.findViewById<MaterialSwitch>(R.id.sheet_series)
+        seriesSwitch.visibility = if (prefs.perSeries) View.VISIBLE else View.GONE
+        seriesSwitch.isChecked = seriesActive
+        seriesSwitch.setOnCheckedChangeListener { _, checked ->
+            if (checked != seriesActive) toggleSeries()
+        }
+    }
+
+    private fun bindAutoScrollSection(view: View) {
+        val autoSwitch = view.findViewById<MaterialSwitch>(R.id.sheet_auto_scroll)
+        val label = view.findViewById<TextView>(R.id.sheet_auto_speed_value)
+        val slider = view.findViewById<Slider>(R.id.sheet_auto_speed)
+
+        autoSwitch.isChecked = autoScrolling
+        // Changing pages or chapters from the sheet must not leave the toggle stale.
+        autoSwitch.setOnCheckedChangeListener { _, checked ->
+            if (checked != autoScrolling) setAutoScroll(checked)
+        }
+
+        label.text = autoSpeedLabel()
+        slider.safeSet(prefs.autoSpeed.toFloat())
+        slider.addOnChangeListener { _, value, fromUser ->
+            if (!fromUser) return@addOnChangeListener
+            prefs.autoSpeed = value.toInt()
+            label.text = autoSpeedLabel()
+        }
+    }
+
+    private fun autoSpeedLabel(): String =
+        getString(R.string.pref_auto_speed) + " · " +
+            getString(R.string.auto_speed_short, prefs.autoSpeed)
+
+    private fun bindOrientationSection(view: View) {
+        val group = view.findViewById<ChipGroup>(R.id.sheet_orientation)
+        group.check(
+            when (requestedOrientation) {
+                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT -> R.id.chip_orient_portrait
+                ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE -> R.id.chip_orient_landscape
+                else -> R.id.chip_orient_default
+            }
+        )
+        group.setOnCheckedStateChangeListener { _, checked ->
+            when (checked.firstOrNull()) {
+                R.id.chip_orient_portrait ->
+                    setOrientationLock(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
+                R.id.chip_orient_landscape ->
+                    setOrientationLock(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)
+                R.id.chip_orient_default ->
+                    setOrientationLock(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED)
+            }
+        }
     }
 
     /** Snaps a value onto the slider's step grid before assigning it. */
@@ -1137,7 +1246,12 @@ class ViewerActivity : AppCompatActivity() {
     // ------------------------------------------------------------------ auto-scroll
 
     private fun toggleAutoScroll() {
-        if (autoScrolling) stopAutoScroll() else startAutoScroll()
+        setAutoScroll(!autoScrolling)
+    }
+
+    /** One place that turns auto-scroll on or off, so the sheet and the menu agree. */
+    private fun setAutoScroll(enabled: Boolean) {
+        if (enabled) startAutoScroll() else stopAutoScroll()
     }
 
     private fun startAutoScroll() {
@@ -1166,7 +1280,7 @@ class ViewerActivity : AppCompatActivity() {
                 val count = source?.pageCount ?: return
                 val step = if (useSpread()) 2 else 1
                 if (currentIndex + step >= count) {
-                    stopAutoScroll()
+                    finishAutoScroll()
                     return
                 }
                 goTo(currentIndex + step)
@@ -1181,11 +1295,26 @@ class ViewerActivity : AppCompatActivity() {
                 autoRemainder -= px
                 if (px > 0) vertical.scrollBy(0, px)
                 if (!vertical.canScrollVertically(1)) {
-                    stopAutoScroll()
+                    finishAutoScroll()
                     return
                 }
                 handler.postDelayed(this, FRAME_MS)
             }
+        }
+    }
+
+    /**
+     * Ends an auto-scroll run at the end of a chapter: with "auto next chapter" on
+     * the reading keeps going in the next one ([setup] restarts it there), otherwise
+     * it simply stops.
+     */
+    private fun finishAutoScroll() {
+        val next = nextChapter()
+        if (prefs.autoNext && next != null) {
+            keepAutoScroll = true
+            openChapter(next, 0)
+        } else {
+            stopAutoScroll()
         }
     }
 
@@ -1220,11 +1349,79 @@ class ViewerActivity : AppCompatActivity() {
         )
     }
 
-    private fun toggleAutoCrop() {
-        autoCrop = !autoCrop
+    private fun toggleAutoCrop() = setAutoCrop(!autoCrop)
+
+    private fun setAutoCrop(enabled: Boolean) {
+        if (autoCrop == enabled) return
+        autoCrop = enabled
         prefs.autoCrop = autoCrop
+        invalidateOptionsMenu()
         attach()
     }
+
+    /**
+     * When on, reaching the end of a chapter opens the next one directly instead of
+     * offering the end-of-chapter prompt.
+     */
+    private fun setAutoNext(enabled: Boolean) {
+        if (prefs.autoNext == enabled) return
+        prefs.autoNext = enabled
+        invalidateOptionsMenu()
+        updateEndCard()
+    }
+
+    /** True while the reader should skip the end card and roll into the next chapter. */
+    private fun autoAdvance() = prefs.autoNext && nextChapter() != null
+
+    /**
+     * Watches for a swipe aimed past the end of the chapter. Paged and strip paging
+     * clamp at the last page, so without this the "auto next chapter" setting would
+     * have nothing to act on; swiping there now just rolls into the next chapter.
+     */
+    private val overSwipeListener = object : RecyclerView.OnItemTouchListener {
+        private var startX = 0f
+        private var startY = 0f
+        private var tracking = false
+
+        override fun onInterceptTouchEvent(rv: RecyclerView, e: MotionEvent): Boolean {
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    startX = e.x
+                    startY = e.y
+                    tracking = true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    val dx = e.x - startX
+                    val dy = e.y - startY
+                    val forward = if (readingDir == "rtl") dx > 0 else dx < 0
+                    if (tracking && forward && abs(dx) > abs(dy) * 2 &&
+                        abs(dx) > swipeMinPx() && autoAdvance() && atChapterEnd()
+                    ) {
+                        openNextChapter()
+                    }
+                    tracking = false
+                }
+            }
+            // Observing only: never intercept, or the page itself could not be paged.
+            return false
+        }
+
+        override fun onTouchEvent(rv: RecyclerView, e: MotionEvent) = Unit
+
+        override fun onRequestDisallowInterceptTouchEvent(disallow: Boolean) = Unit
+    }
+
+    /** True when the reader sits on the last page or at the bottom of a strip. */
+    private fun atChapterEnd(): Boolean {
+        val src = source ?: return false
+        return when (mode) {
+            MODE_PAGED -> currentIndex >=
+                (if (useSpread()) src.pageCount - 2 else src.pageCount - 1).coerceAtLeast(0)
+            else -> !vertical.canScrollVertically(1)
+        }
+    }
+
+    private fun swipeMinPx(): Int = (resources.displayMetrics.widthPixels / 8f).toInt()
 
     // ------------------------------------------------------------------ chapter list
 

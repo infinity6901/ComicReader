@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  The reader's overflow menu. Everything a reader reaches constantly — moving
+  between pages and chapters, bookmarks and the two auto modes — sits at the top
+  level, so nothing important needs a scroll. The settings that also live in the
+  reader sheet (Display / Page filter / Reading / Page actions) are grouped into
+  submenus so the top-level list stays short.
+-->
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
@@ -30,19 +37,35 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_bookmark_list"
+        android:title="@string/menu_bookmark_list"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_prev_chapter"
+        android:title="@string/menu_prev_chapter"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_next_chapter"
+        android:title="@string/menu_next_chapter"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_auto_scroll"
         android:checkable="true"
         android:title="@string/menu_auto_scroll"
         app:showAsAction="never" />
 
     <item
-        android:id="@+id/menu_auto_speed"
-        android:title="@string/menu_auto_speed"
+        android:id="@+id/menu_auto_next"
+        android:checkable="true"
+        android:title="@string/menu_auto_next"
         app:showAsAction="never" />
 
     <item
-        android:id="@+id/menu_fit"
-        android:title="@string/menu_fit"
+        android:id="@+id/menu_display"
+        android:title="@string/menu_group_display"
         app:showAsAction="never">
         <menu>
             <group android:checkableBehavior="single">
@@ -59,14 +82,6 @@
                     android:id="@+id/menu_fit_stretch"
                     android:title="@string/menu_fit_stretch" />
             </group>
-        </menu>
-    </item>
-
-    <item
-        android:id="@+id/menu_page_mode"
-        android:title="@string/menu_page_mode"
-        app:showAsAction="never">
-        <menu>
             <group android:checkableBehavior="single">
                 <item
                     android:id="@+id/menu_mode_paged"
@@ -78,14 +93,6 @@
                     android:id="@+id/menu_mode_longstrip"
                     android:title="@string/page_mode_longstrip" />
             </group>
-        </menu>
-    </item>
-
-    <item
-        android:id="@+id/menu_dir"
-        android:title="@string/menu_reading_dir"
-        app:showAsAction="never">
-        <menu>
             <group android:checkableBehavior="single">
                 <item
                     android:id="@+id/menu_dir_ltr"
@@ -94,20 +101,17 @@
                     android:id="@+id/menu_dir_rtl"
                     android:title="@string/reading_rtl" />
             </group>
+            <item
+                android:id="@+id/menu_brightness"
+                android:title="@string/menu_brightness" />
+            <item
+                android:id="@+id/menu_page_spacing"
+                android:title="@string/menu_page_spacing" />
+            <item
+                android:id="@+id/menu_auto_speed"
+                android:title="@string/menu_auto_speed" />
         </menu>
     </item>
-
-    <item
-        android:id="@+id/menu_two_page"
-        android:checkable="true"
-        android:title="@string/menu_two_page"
-        app:showAsAction="never" />
-
-    <item
-        android:id="@+id/menu_auto_crop"
-        android:checkable="true"
-        android:title="@string/menu_auto_crop"
-        app:showAsAction="never" />
 
     <item
         android:id="@+id/menu_filters"
@@ -135,55 +139,34 @@
     </item>
 
     <item
-        android:id="@+id/menu_brightness"
-        android:title="@string/menu_brightness"
-        app:showAsAction="never" />
-
-    <item
-        android:id="@+id/menu_page_spacing"
-        android:title="@string/menu_page_spacing"
-        app:showAsAction="never" />
-
-    <item
-        android:id="@+id/menu_prev_chapter"
-        android:title="@string/menu_prev_chapter"
-        app:showAsAction="never" />
-
-    <item
-        android:id="@+id/menu_next_chapter"
-        android:title="@string/menu_next_chapter"
-        app:showAsAction="never" />
-
-    <item
-        android:id="@+id/menu_bookmark_list"
-        android:title="@string/menu_bookmark_list"
-        app:showAsAction="never" />
-
-    <item
-        android:id="@+id/menu_crop"
-        android:title="@string/menu_crop"
-        app:showAsAction="never" />
-
-    <item
-        android:id="@+id/menu_share_page"
-        android:title="@string/menu_share_page"
-        app:showAsAction="never" />
-
-    <item
-        android:id="@+id/menu_save_page"
-        android:title="@string/menu_save_page"
-        app:showAsAction="never" />
-
-    <item
-        android:id="@+id/menu_rotate"
-        android:title="@string/menu_rotate"
-        app:showAsAction="never" />
-
-    <item
-        android:id="@+id/menu_orientation"
-        android:title="@string/menu_orientation"
+        android:id="@+id/menu_reading"
+        android:title="@string/menu_group_reading"
         app:showAsAction="never">
         <menu>
+            <item
+                android:id="@+id/menu_two_page"
+                android:checkable="true"
+                android:title="@string/menu_two_page" />
+            <item
+                android:id="@+id/menu_auto_crop"
+                android:checkable="true"
+                android:title="@string/menu_auto_crop" />
+            <item
+                android:id="@+id/menu_keep_on"
+                android:checkable="true"
+                android:title="@string/menu_keep_on" />
+            <item
+                android:id="@+id/menu_night"
+                android:checkable="true"
+                android:title="@string/menu_night" />
+            <item
+                android:id="@+id/menu_fullscreen"
+                android:checkable="true"
+                android:title="@string/menu_fullscreen" />
+            <item
+                android:id="@+id/menu_series"
+                android:checkable="true"
+                android:title="@string/menu_remember_series" />
             <group android:checkableBehavior="single">
                 <item
                     android:id="@+id/menu_orient_default"
@@ -199,27 +182,23 @@
     </item>
 
     <item
-        android:id="@+id/menu_series"
-        android:checkable="true"
-        android:title="@string/menu_remember_series"
-        app:showAsAction="never" />
-
-    <item
-        android:id="@+id/menu_keep_on"
-        android:checkable="true"
-        android:title="@string/menu_keep_on"
-        app:showAsAction="never" />
-
-    <item
-        android:id="@+id/menu_night"
-        android:checkable="true"
-        android:title="@string/menu_night"
-        app:showAsAction="never" />
-
-    <item
-        android:id="@+id/menu_fullscreen"
-        android:checkable="true"
-        android:title="@string/menu_fullscreen"
-        app:showAsAction="never" />
+        android:id="@+id/menu_page_tools"
+        android:title="@string/menu_group_page"
+        app:showAsAction="never">
+        <menu>
+            <item
+                android:id="@+id/menu_crop"
+                android:title="@string/menu_crop" />
+            <item
+                android:id="@+id/menu_share_page"
+                android:title="@string/menu_share_page" />
+            <item
+                android:id="@+id/menu_save_page"
+                android:title="@string/menu_save_page" />
+            <item
+                android:id="@+id/menu_rotate"
+                android:title="@string/menu_rotate" />
+        </menu>
+    </item>
 
 </menu>

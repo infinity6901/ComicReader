@@ -91,6 +91,11 @@ class Prefs(context: Context) {
         get() = bool(KEY_RESUME, true)
         set(v) = put(KEY_RESUME, v)
 
+    /** Ask whether to resume or start from the first page when a chapter has saved progress. */
+    var askResume: Boolean
+        get() = bool(KEY_ASK_RESUME, true)
+        set(v) = put(KEY_ASK_RESUME, v)
+
     var twoPage: Boolean
         get() = bool(KEY_TWO_PAGE, false)
         set(v) = put(KEY_TWO_PAGE, v)
@@ -241,6 +246,7 @@ class Prefs(context: Context) {
         private const val KEY_SPACING = "pref_page_spacing"
         private const val KEY_AUTO_NEXT = "pref_auto_next"
         private const val KEY_RESUME = "pref_resume"
+        private const val KEY_ASK_RESUME = "pref_ask_resume"
         private const val KEY_TWO_PAGE = "pref_two_page"
         private const val KEY_NIGHT = "pref_night"
         private const val KEY_TAP_ZONES = "pref_tap_zones"
@@ -265,7 +271,7 @@ class Prefs(context: Context) {
         private val KNOWN_KEYS = setOf(
             KEY_THEME, KEY_LOCALE, KEY_CHARSET, KEY_FULLSCREEN, KEY_KEEP_ON, KEY_READING_DIR,
             KEY_PAGE_MODE, KEY_FIT, KEY_FILTER, KEY_BRIGHTNESS, KEY_SPACING, KEY_AUTO_NEXT,
-            KEY_RESUME, KEY_TWO_PAGE, KEY_NIGHT, KEY_TAP_ZONES, KEY_VOLUME_KEYS,
+            KEY_RESUME, KEY_ASK_RESUME, KEY_TWO_PAGE, KEY_NIGHT, KEY_TAP_ZONES, KEY_VOLUME_KEYS,
             KEY_BRIGHTNESS_GESTURE, KEY_DOUBLE_TAP, KEY_SHOW_HIDDEN, KEY_THUMBS, KEY_GRID,
             KEY_COLUMNS, KEY_SORT, KEY_SORT_DIR, KEY_FILENAMES, KEY_PATHVIEW, KEY_LIST_STATUSBAR,
             KEY_QUICK_FAB, KEY_AUTO_CROP, KEY_PRELOAD, KEY_AUTO_SPEED, KEY_PER_SERIES

@@ -236,6 +236,72 @@
             android:valueFrom="0"
             android:valueTo="48" />
 
+        <!-- Auto-scroll -->
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/sheet_auto_scroll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_4"
+            android:minHeight="48dp"
+            android:text="@string/menu_auto_scroll" />
+
+        <TextView
+            android:id="@+id/sheet_auto_speed_value"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_3"
+            android:text="@string/pref_auto_speed"
+            android:textAppearance="@style/TextAppearance.ComicReader.Label"
+            android:textColor="?attr/colorPrimary"
+            tools:text="Auto-scroll speed · 5 / 10" />
+
+        <com.google.android.material.slider.Slider
+            android:id="@+id/sheet_auto_speed"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:stepSize="1"
+            android:value="5"
+            android:valueFrom="1"
+            android:valueTo="10" />
+
+        <!-- Orientation lock -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_5"
+            android:text="@string/menu_orientation"
+            android:textAppearance="@style/TextAppearance.ComicReader.Label"
+            android:textColor="?attr/colorPrimary" />
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/sheet_orientation"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_1"
+            app:singleSelection="true">
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chip_orient_default"
+                style="@style/Widget.Material3.Chip.Filter"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/orientation_default" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chip_orient_portrait"
+                style="@style/Widget.Material3.Chip.Filter"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/orientation_portrait" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chip_orient_landscape"
+                style="@style/Widget.Material3.Chip.Filter"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/orientation_landscape" />
+        </com.google.android.material.chip.ChipGroup>
+
         <!-- Switches -->
         <com.google.android.material.materialswitch.MaterialSwitch
             android:id="@+id/sheet_two_page"
@@ -244,6 +310,13 @@
             android:layout_marginTop="@dimen/space_4"
             android:minHeight="48dp"
             android:text="@string/menu_two_page" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/sheet_auto_crop"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:text="@string/menu_auto_crop" />
 
         <com.google.android.material.materialswitch.MaterialSwitch
             android:id="@+id/sheet_night"
@@ -258,6 +331,27 @@
             android:layout_height="wrap_content"
             android:minHeight="48dp"
             android:text="@string/menu_keep_on" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/sheet_fullscreen"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:text="@string/menu_fullscreen" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/sheet_auto_next"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:text="@string/menu_auto_next" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/sheet_series"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:text="@string/menu_remember_series" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/sheet_more_settings"

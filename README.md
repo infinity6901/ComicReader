@@ -35,11 +35,15 @@ Get the latest signed APK from the [**Releases**](https://github.com/infinity690
 ### File browser
 - Browse local storage by folder; list and grid layouts.
 - Tabs for **Browse**, **Favorites**, **History** and **Bookmarks**.
+- A **Recent** row sits above the browsing list and opens the folder holding the
+  last chapter you read.
 - Sort by name / size / date / type (natural number ordering, so `page2` sorts
   before `page10`), ascending or descending.
 - Incremental search within the current folder.
 - Favorites (star) and reading history, with jump-back to the last page read.
-  Tapping a history entry opens the folder that contains that chapter.
+  Every history entry shows its **parent folder below the name**, so bare
+  chapters like "Chapter 1" stay recognisable. Tapping a history entry opens
+  the folder that contains that chapter.
 - Long-press a file or folder to favorite it, set it as the home folder, open its
   location, rename, mark read/unread or delete it.
 - Breadcrumb path bar, quick favorite button, back button navigates up (clamped
@@ -77,12 +81,21 @@ Get the latest signed APK from the [**Releases**](https://github.com/infinity690
   filter.
 - **Page spacing** slider for vertical and long-strip modes.
 - **Next / previous chapter** buttons, plus an **end-of-chapter card** with a
-  direct link to the next chapter. Auto-advance is optional.
+  direct link to the next chapter.
+- **Auto next chapter:** reaching the last page rolls straight into the next
+  chapter and the end-of-chapter card is skipped entirely (it still appears
+  when the setting is off, or on the last chapter of a folder).
 - Bookmarks per page, plus a bookmark list to jump between them.
 - Go-to-page, orientation lock, rotate, keep-screen-on, immersive fullscreen,
   and tap-to-toggle the UI bars. Volume keys turn pages.
-- A reader settings **bottom sheet** exposes the most-used options in place.
-- Resumes at the last page read; per-book reading position is stored in history.
+- A reader settings **bottom sheet** exposes every reader option in place, and
+  carries the same settings as the 3-dots menu (Display / Page filter / Reading
+  / Page actions), so both surfaces stay in sync.
+- Resumes at the last page read. If **Ask where to start** is on, a chapter
+  with saved progress asks first: *Resume page* or *First page*, with the page
+  number and percentage. Chapters opened explicitly (history, bookmark,
+  chapter list, next-chapter) never ask.
+- Per-book reading position is stored in history.
 - Every reader option is written back to preferences, so the mode, fit, filter,
   brightness, spacing, direction and toggles **persist across chapters and app
   restarts**.
@@ -92,6 +105,8 @@ Get the latest signed APK from the [**Releases**](https://github.com/infinity690
 - Per-app language: system, English, 한국어, 日本語, Русский.
 - Archive filename charset (UTF-8, CP949, Shift_JIS, GBK, Windows-1251).
 - Default reading direction, page mode, fit, filter, page spacing, brightness.
+- Reader: resume where I left off, ask whether to resume or start from the
+  first page, and open the next chapter automatically when a chapter ends.
 - Gestures (tap zones, volume keys, brightness drag, double-tap zoom).
 - File-list options (file names, status bar, breadcrumb, quick button).
 - Clear history, clear bookmarks, clear thumbnails, reset all settings.
@@ -159,8 +174,8 @@ the archive backends survive minification.
 
 | Artifact | Size | Notes |
 |---|---|---|
-| `ComicReader-1.1-foss-release.apk` | 2.61 MB | v2-signed, R8-minified, offline |
-| `ComicReader-1.1-debug.apk` | 8.65 MB | debuggable, unsigned-config |
+| `ComicReader-1.2-foss-release.apk` | 2.62 MB | v2-signed, R8-minified, offline |
+| `ComicReader-1.2-debug.apk` | 7.53 MB | debuggable, unsigned-config |
 
 ### Install on a connected device
 
