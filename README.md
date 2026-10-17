@@ -84,7 +84,10 @@ Get the latest signed APK from the [**Releases**](https://github.com/infinity690
   direct link to the next chapter.
 - **Auto next chapter:** reaching the last page rolls straight into the next
   chapter and the end-of-chapter card is skipped entirely (it still appears
-  when the setting is off, or on the last chapter of a folder).
+  when the setting is off, or on the last chapter of a folder). In **long strip**
+  and **vertical** modes the next chapter's pages are already laid into the strip,
+  so scrolling (or an upward flick) simply continues into them the way page-to-page
+  scrolling does inside a single archive - no stop, no reload, no end card.
 - Bookmarks per page, plus a bookmark list to jump between them.
 - Go-to-page, orientation lock, rotate, keep-screen-on, immersive fullscreen,
   and tap-to-toggle the UI bars. Volume keys turn pages.
@@ -174,6 +177,8 @@ the archive backends survive minification.
 
 | Artifact | Size | Notes |
 |---|---|---|
+| `ComicReader-1.3-foss-release.apk` | 2.63 MB | v2-signed, R8-minified, offline |
+| `ComicReader-1.3-debug.apk` | 7.69 MB | debuggable, unsigned-config |
 | `ComicReader-1.2-foss-release.apk` | 2.62 MB | v2-signed, R8-minified, offline |
 | `ComicReader-1.2-debug.apk` | 7.53 MB | debuggable, unsigned-config |
 

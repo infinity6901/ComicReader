@@ -94,6 +94,19 @@ class ViewerActivity : AppCompatActivity() {
     private var adapter: PageAdapter? = null
     private var file: File? = null
 
+    /**
+     * The next chapter, opened ahead so a vertical or long-strip reader rolls
+     * straight into it instead of stopping at the chapter's end. While it is
+     * pending it is simply appended to the strip ([stripAheadFile] tracks the
+     * chapter it belongs to, since [file] still points at the one being read).
+     */
+    private var stripAhead: PageSource? = null
+    private var stripAheadFile: File? = null
+    private var stripAheadJob: Job? = null
+
+    /** True between spotting a chapter boundary and running the posted roll-on. */
+    private var stripRollPending = false
+
     /** Sibling chapters (openable files in the same folder), natural-ordered. */
     private var chapters: List<File> = emptyList()
 
@@ -184,10 +197,30 @@ class ViewerActivity : AppCompatActivity() {
             override fun onScrolled(rv: RecyclerView, dx: Int, dy: Int) {
                 if (mode == MODE_PAGED) return
                 val lm = rv.layoutManager as? LinearLayoutManager ?: return
+                // The page the reader counts as current: the first one fully on screen.
                 val pos = lm.findFirstCompletelyVisibleItemPosition().takeIf { it >= 0 }
                     ?: lm.findFirstVisibleItemPosition()
+                // The chapter behind the reader was appended to this strip, so the
+                // pages on screen already belong to it: rolling over is bookkeeping.
+                // RecyclerView warns against trimming items from inside a scroll
+                // callback, so the roll is posted; until it runs the index is left
+                // alone rather than being read against a strip it no longer matches.
+                if (stripAhead != null && pos >= chapterPages()) {
+                    if (!stripRollPending) {
+                        stripRollPending = true
+                        rv.post {
+                            stripRollPending = false
+                            commitStripChapter()
+                        }
+                    }
+                    return
+                }
+                if (stripRollPending) return
                 if (pos >= 0 && itemToPage(pos) != currentIndex) {
+                    // Never count past this chapter: crossing into the next one is
+                    // the roll-on's job, not the indicator's.
                     currentIndex = itemToPage(pos)
+                        .coerceIn(0, (chapterPages() - 1).coerceAtLeast(0))
                     seek.progress = pos
                     onPageChanged()
                 }
@@ -408,6 +441,11 @@ class ViewerActivity : AppCompatActivity() {
     private fun closeSource() {
         adapter?.release()
         adapter = null
+        stripAheadJob?.cancel()
+        stripAheadJob = null
+        runCatching { stripAhead?.close() }
+        stripAhead = null
+        stripAheadFile = null
         runCatching { source?.close() }
         source = null
         pager.adapter = null
@@ -434,6 +472,7 @@ class ViewerActivity : AppCompatActivity() {
         currentIndex = start.coerceIn(0, src.pageCount - 1)
         seenPages.clear()
         attach()
+        prepareStripAhead()
 
         // Carrying an auto-scroll run into the next chapter must survive the reload.
         if (keepAutoScroll) {
@@ -485,6 +524,9 @@ class ViewerActivity : AppCompatActivity() {
         adapter = a
 
         val item = pageToItem(currentIndex)
+        // The roll-on chapter travels with the reader: adapters are rebuilt for
+        // every layout change, so the already-opened source is laid in again.
+        if (mode != MODE_PAGED) stripAhead?.let { a.append(it) }
         if (mode == MODE_PAGED) {
             pager.layoutDirection =
                 if (readingDir == "rtl") View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
@@ -498,9 +540,116 @@ class ViewerActivity : AppCompatActivity() {
             vertical.adapter = a
             vertical.scrollToPosition(item)
         }
-        seek.max = (a.itemCount - 1).coerceAtLeast(0)
+        // The slider stays scoped to this chapter even while the strip holds more:
+        // seeking past its end would roll on, which the slider should not do by itself.
+        seek.max = pageToItem((src.pageCount - 1).coerceAtLeast(0))
         seek.progress = item
         onPageChanged()
+    }
+
+    // ------------------------------------------------------- seamless chapter roll
+
+    /** Pages in the chapter being read (the strip may already hold the next one too). */
+    private fun chapterPages() = source?.pageCount ?: 0
+
+    /**
+     * Opens the chapter after this one so vertical and long-strip reading can be
+     * rolled straight into it. Nothing is on screen yet: once its pages are open
+     * they are laid in behind the current chapter's, and scrolling simply reaches
+     * them, exactly like scrolling between two pages of one archive.
+     */
+    private fun prepareStripAhead() {
+        stripAheadJob?.cancel()
+        stripAheadJob = null
+        if (mode == MODE_PAGED || !prefs.autoNext) return
+        if (stripAhead != null) return
+        val next = nextChapter() ?: return
+        stripAheadJob = lifecycleScope.launch {
+            val (src, ok) = withContext(AppDispatchers.io) {
+                val s = runCatching { PageSources.open(next, prefs.charset) }.getOrNull()
+                try {
+                    ensureActive()
+                } catch (e: CancellationException) {
+                    // A newer open replaced this one: do not leak the file handle.
+                    runCatching { s?.close() }
+                    throw e
+                }
+                s to (s != null && s.pageCount > 0)
+            }
+            if (!ok || src == null) {
+                // Unreadable: the reader just falls back to stopping at the end.
+                runCatching { src?.close() }
+                return@launch
+            }
+            stripAhead = src
+            stripAheadFile = next
+            // The mode or the setting may have changed while the archive was opening.
+            if (mode != MODE_PAGED && prefs.autoNext) adapter?.append(src)
+        }
+    }
+
+    /**
+     * Switches the reader over to the chapter that was appended to the strip. The
+     * strip already shows its pages, so nothing is reloaded or re-decoded: the file,
+     * source and page index simply move on, the pages already scrolled past are
+     * trimmed away, and the chapter after that is opened for the next roll-on.
+     */
+    private fun commitStripChapter() {
+        val a = adapter ?: return
+        val finished = source ?: return
+        val next = stripAhead ?: return
+        val nextFile = stripAheadFile ?: return
+        val boundary = finished.pageCount
+
+        // The chapter just read is done: record it before moving on.
+        currentIndex = (boundary - 1).coerceAtLeast(0)
+        onPageChanged()
+        saveHistory()
+        flushStats()
+
+        // Re-anchor on the boundary item at its current offset: it is the first page
+        // of the new chapter that survives the trim, and its (usually negative) top
+        // keeps the viewport exactly where it was.
+        val lm = vertical.layoutManager as? LinearLayoutManager
+        val first = lm?.findFirstVisibleItemPosition() ?: 0
+        val anchor = first.coerceAtLeast(boundary)
+        val top = lm?.findViewByPosition(anchor)?.top ?: 0
+
+        source = next
+        file = nextFile
+        currentIndex = (first - boundary).coerceAtLeast(0)
+        stripAhead = null
+        stripAheadFile = null
+        seenPages.clear()
+        markedRead = false
+        toolbar.title = chapterLabel(nextFile)
+
+        a.dropTo(boundary)
+        lm?.scrollToPositionWithOffset((anchor - boundary).coerceAtLeast(0), top)
+
+        seek.max = pageToItem((next.pageCount - 1).coerceAtLeast(0))
+        seek.progress = pageToItem(currentIndex)
+        onPageChanged()
+        prepareStripAhead()
+    }
+
+    /**
+     * Undoes the roll-on: closes the chapter opened ahead and trims it back out of
+     * the strip, so turning "auto next chapter" off mid-chapter still ends it with
+     * the usual prompt.
+     */
+    private fun dropStripAhead() {
+        stripAheadJob?.cancel()
+        stripAheadJob = null
+        val ahead = stripAhead ?: return
+        stripAhead = null
+        stripAheadFile = null
+        // The adapter owns its segments: trimming the chapter out of the strip
+        // lets it close the source once nothing is decoding from it anymore.
+        val a = adapter
+        if (a != null) a.dropAfter(chapterPages()) else runCatching { ahead.close() }
+        // Restores the end card, which the pending chapter may have suppressed.
+        updateEndCard()
     }
 
     private fun adapterMode(): PageAdapter.Mode = when (mode) {
@@ -554,12 +703,21 @@ class ViewerActivity : AppCompatActivity() {
     /** Called when the reader is told to move past the last page. */
     private fun handleAdvance() {
         val next = nextChapter()
-        if (next != null && prefs.autoNext) {
-            openChapter(next, 0)
-        } else if (next != null) {
-            showEndCard()
-        } else {
+        if (next == null) {
             toast(R.string.finished_last_chapter)
+            return
+        }
+        if (!prefs.autoNext) {
+            showEndCard()
+            return
+        }
+        // A strip that already holds the next chapter needs no reload: rolling on
+        // is pure bookkeeping, and the pages on screen keep rendering.
+        if (mode != MODE_PAGED && stripAhead != null) {
+            commitStripChapter()
+            vertical.scrollToPosition(0)
+        } else {
+            openChapter(next, 0)
         }
     }
 
@@ -964,8 +1122,11 @@ class ViewerActivity : AppCompatActivity() {
         if (newMode == mode) return
         stopAutoScroll()
         mode = newMode
+        // Only the strip modes lay the next chapter in behind this one.
+        if (mode == MODE_PAGED) dropStripAhead()
         persistLayout()
         attach()
+        prepareStripAhead()
     }
 
     private fun setSpacingDp(dp: Int) {
@@ -1361,11 +1522,14 @@ class ViewerActivity : AppCompatActivity() {
 
     /**
      * When on, reaching the end of a chapter opens the next one directly instead of
-     * offering the end-of-chapter prompt.
+     * offering the end-of-chapter prompt. In the strip modes the next chapter is
+     * also opened right away and laid in behind this one, so reading never stops at
+     * the boundary in the first place.
      */
     private fun setAutoNext(enabled: Boolean) {
         if (prefs.autoNext == enabled) return
         prefs.autoNext = enabled
+        if (enabled) prepareStripAhead() else dropStripAhead()
         invalidateOptionsMenu()
         updateEndCard()
     }
@@ -1374,9 +1538,11 @@ class ViewerActivity : AppCompatActivity() {
     private fun autoAdvance() = prefs.autoNext && nextChapter() != null
 
     /**
-     * Watches for a swipe aimed past the end of the chapter. Paged and strip paging
-     * clamp at the last page, so without this the "auto next chapter" setting would
-     * have nothing to act on; swiping there now just rolls into the next chapter.
+     * Watches for a swipe aimed past the end of the chapter. Paged reading clamps
+     * at the last page, so without this the "auto next chapter" setting would have
+     * nothing to act on; swiping there now just rolls into the next chapter. Strips
+     * read downward, so their version of the gesture is a flick upward — and it only
+     * has to catch the gap before the next chapter's pages have been laid in.
      */
     private val overSwipeListener = object : RecyclerView.OnItemTouchListener {
         private var startX = 0f
@@ -1393,9 +1559,13 @@ class ViewerActivity : AppCompatActivity() {
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     val dx = e.x - startX
                     val dy = e.y - startY
-                    val forward = if (readingDir == "rtl") dx > 0 else dx < 0
-                    if (tracking && forward && abs(dx) > abs(dy) * 2 &&
-                        abs(dx) > swipeMinPx() && autoAdvance() && atChapterEnd()
+                    val strip = mode != MODE_PAGED
+                    // "Forward" is leftward in a paged book (rightward in RTL) and
+                    // downward in the finger, i.e. a flick up, for a strip.
+                    val along = if (strip) -dy else if (readingDir == "rtl") dx else -dx
+                    val across = if (strip) abs(dx) else abs(dy)
+                    if (tracking && along > across * 2 && along > swipeMinPx() &&
+                        autoAdvance() && atChapterEnd()
                     ) {
                         openNextChapter()
                     }
