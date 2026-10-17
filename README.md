@@ -160,7 +160,7 @@ the archive backends survive minification.
 | Artifact | Size | Notes |
 |---|---|---|
 | `ComicReader-1.1-foss-release.apk` | 2.61 MB | v2-signed, R8-minified, offline |
-| `ComicReader-1.1-debug.apk` | 7.52 MB | debuggable, unsigned-config |
+| `ComicReader-1.1-debug.apk` | 8.65 MB | debuggable, unsigned-config |
 
 ### Install on a connected device
 
