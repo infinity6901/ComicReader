@@ -1,4 +1,4 @@
-﻿package com.infinity.comicreader.reader
+package com.infinity.comicreader.reader
 
 import android.graphics.Bitmap
 import com.infinity.comicreader.util.Formats
@@ -14,12 +14,16 @@ class ZipSource(file: File, charsetName: String) : PageSource {
     private val zip: ZipFile = runCatching { ZipFile(file, Charset.forName(charsetName)) }
         .getOrElse { ZipFile(file) }
 
-    private val entries: List<ZipEntry> = zip.entries().asSequence()
-        .filter { !it.isDirectory && Formats.isImageName(it.name) }
-        .sortedWith { a, b -> NaturalOrder.compare(a.name, b.name) }
-        .toList()
+    private val entries: List<ZipEntry> = try {
+        zip.entries().asSequence()
+            .filter { !it.isDirectory && Formats.isImageName(it.name) }
+            .sortedWith { a, b -> NaturalOrder.compare(a.name, b.name) }
+            .toList()
+    } catch (t: Throwable) {
+        runCatching { zip.close() }
+        throw t
+    }
 
-    override val title: String = file.name
     override val pageCount: Int get() = entries.size
 
     override fun loadPage(index: Int, reqWidth: Int, reqHeight: Int): Bitmap {

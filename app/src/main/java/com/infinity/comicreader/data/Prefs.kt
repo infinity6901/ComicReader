@@ -1,4 +1,4 @@
-﻿package com.infinity.comicreader.data
+package com.infinity.comicreader.data
 
 import android.content.Context
 import android.content.SharedPreferences
@@ -99,6 +99,26 @@ class Prefs(context: Context) {
         get() = bool(KEY_NIGHT, false)
         set(v) = put(KEY_NIGHT, v)
 
+    /** Trim blank borders from pages in paged and vertical modes. */
+    var autoCrop: Boolean
+        get() = bool(KEY_AUTO_CROP, false)
+        set(v) = put(KEY_AUTO_CROP, v)
+
+    /** How many pages ahead to decode (0 = off). Stored as a string by the list preference. */
+    var preload: Int
+        get() = str(KEY_PRELOAD, "2").toIntOrNull()?.coerceIn(0, 6) ?: 2
+        set(v) = put(KEY_PRELOAD, v.coerceIn(0, 6).toString())
+
+    /** Auto-scroll speed, 1 (slow) .. 10 (fast). */
+    var autoSpeed: Int
+        get() = integer(KEY_AUTO_SPEED, 5).coerceIn(1, 10)
+        set(v) = put(KEY_AUTO_SPEED, v.coerceIn(1, 10))
+
+    /** Let the reader remember mode / direction / fit / spread per folder. */
+    var perSeries: Boolean
+        get() = bool(KEY_PER_SERIES, true)
+        set(v) = put(KEY_PER_SERIES, v)
+
     // ---------------------------------------------------------------- gestures
 
     var tapZones: Boolean
@@ -170,10 +190,10 @@ class Prefs(context: Context) {
         get() = ui.getString("home_path", null)
         set(v) = ui.edit().putString("home_path", v).apply()
 
-    /** 0 browse, 1 favorites, 2 history, 3 bookmarks */
-    var tab: Int
-        get() = ui.getInt("tab", 0)
-        set(v) = ui.edit().putInt("tab", v).apply()
+    /** Search below the current folder, not only in it. */
+    var deepSearch: Boolean
+        get() = ui.getBoolean("deep_search", false)
+        set(v) = ui.edit().putBoolean("deep_search", v).apply()
 
     val nightMode: Int
         get() = when (theme) {
@@ -185,6 +205,25 @@ class Prefs(context: Context) {
     fun reset() {
         val e = sp.edit()
         sp.all.keys.filter { it.startsWith("pref_") }.forEach { e.remove(it) }
+        e.apply()
+    }
+
+    /** Every stored `pref_*` value of a simple type, for backup. */
+    fun exportAll(): Map<String, Any> =
+        sp.all.filter { (k, v) -> k in KNOWN_KEYS && (v is String || v is Boolean || v is Int) }
+            .mapValues { it.value as Any }
+
+    /** Restores values written by [exportAll]; unknown keys and odd types are ignored. */
+    fun importAll(values: Map<String, Any>) {
+        val e = sp.edit()
+        for ((k, v) in values) {
+            if (k !in KNOWN_KEYS) continue
+            when (v) {
+                is String -> e.putString(k, v)
+                is Boolean -> e.putBoolean(k, v)
+                is Int -> e.putInt(k, v)
+            }
+        }
         e.apply()
     }
 
@@ -218,5 +257,18 @@ class Prefs(context: Context) {
         private const val KEY_PATHVIEW = "pref_list_pathview"
         private const val KEY_LIST_STATUSBAR = "pref_list_statusbar"
         private const val KEY_QUICK_FAB = "pref_list_quickfab"
+        private const val KEY_AUTO_CROP = "pref_auto_crop"
+        private const val KEY_PRELOAD = "pref_preload"
+        private const val KEY_AUTO_SPEED = "pref_auto_speed"
+        private const val KEY_PER_SERIES = "pref_per_series"
+
+        private val KNOWN_KEYS = setOf(
+            KEY_THEME, KEY_LOCALE, KEY_CHARSET, KEY_FULLSCREEN, KEY_KEEP_ON, KEY_READING_DIR,
+            KEY_PAGE_MODE, KEY_FIT, KEY_FILTER, KEY_BRIGHTNESS, KEY_SPACING, KEY_AUTO_NEXT,
+            KEY_RESUME, KEY_TWO_PAGE, KEY_NIGHT, KEY_TAP_ZONES, KEY_VOLUME_KEYS,
+            KEY_BRIGHTNESS_GESTURE, KEY_DOUBLE_TAP, KEY_SHOW_HIDDEN, KEY_THUMBS, KEY_GRID,
+            KEY_COLUMNS, KEY_SORT, KEY_SORT_DIR, KEY_FILENAMES, KEY_PATHVIEW, KEY_LIST_STATUSBAR,
+            KEY_QUICK_FAB, KEY_AUTO_CROP, KEY_PRELOAD, KEY_AUTO_SPEED, KEY_PER_SERIES
+        )
     }
 }

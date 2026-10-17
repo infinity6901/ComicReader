@@ -11,7 +11,6 @@
     <string name="tab_bookmarks">Bookmarks</string>
 
     <!-- ===================== List screen ===================== -->
-    <string name="menu_browse">Browse</string>
     <string name="menu_favorites">Favorites</string>
     <string name="menu_history">History</string>
     <string name="menu_bookmarks">Bookmarks</string>
@@ -37,9 +36,25 @@
     <string name="menu_mark_read">Mark as read</string>
     <string name="menu_mark_unread">Mark as unread</string>
     <string name="menu_continue">Continue reading</string>
-    <string name="menu_select_all">Select all</string>
-    <string name="menu_clear_selection">Clear selection</string>
-    <string name="menu_delete_selected">Delete selected</string>
+    <string name="continue_none">Nothing left to continue in this folder</string>
+    <string name="menu_mark_all_read">Mark all as read</string>
+    <string name="menu_mark_all_unread">Mark all as unread</string>
+    <string name="marked_read">Marked as read</string>
+    <string name="marked_unread">Marked as unread</string>
+    <string name="menu_search_deep">Search subfolders</string>
+    <string name="menu_stats">Reading statistics</string>
+    <string name="reset_stats">Reset</string>
+    <string name="stats_body">Chapters read: %1$d\nPages read: %2$d\nTime reading: %3$d h %4$d min\nDays read: %5$d\nCurrent streak: %6$d days\nBest streak: %7$d days</string>
+    <string name="menu_dupes">Find duplicate files</string>
+    <string name="menu_large">Largest files</string>
+    <string name="select_extras">Keep one of each</string>
+    <string name="delete_selected">Delete selected</string>
+    <string name="delete_selected_n">Delete %1$d (%2$s)</string>
+    <string name="delete_selected_msg">Permanently delete %1$d files?</string>
+    <string name="dupe_group">%1$d identical copies</string>
+    <string name="cleanup_nothing">Nothing found</string>
+    <string name="invalid_name">That name is not allowed</string>
+    <string name="op_failed">Operation failed</string>
 
     <string name="empty_folder">Empty folder</string>
     <string name="no_history">Nothing read yet</string>
@@ -50,18 +65,15 @@
     <string name="error_open">Cannot open this file</string>
     <string name="grant_access">Grant access</string>
     <string name="all_files_access">ComicReader needs access to all files to open comic folders anywhere on your device.</string>
-    <string name="open_settings">Open settings</string>
     <string name="page_indicator">%1$d / %2$d</string>
-    <string name="page_progress">%1$d of %2$d</string>
     <string name="read_progress">%1$d / %2$d</string>
     <string name="read_badge">Read</string>
-    <string name="new_badge">New</string>
     <string name="books_count">%1$d items</string>
+    <string name="folder_read_summary">%1$d items · %2$d read</string>
     <string name="pages_count">%1$d pages</string>
     <string name="page_number">Page %1$d</string>
     <string name="percent_format">%1$d%%</string>
     <string name="missing_file">Missing from storage</string>
-    <string name="folder_and_more">%1$s · %2$d items</string>
     <string name="deleted_format">Deleted %1$d item(s)</string>
     <string name="delete_confirm_title">Delete files?</string>
     <string name="delete_confirm_msg">This permanently deletes the selected files from storage.</string>
@@ -80,7 +92,6 @@
     <string name="menu_fit_stretch">Stretch</string>
     <string name="menu_rotate">Rotate</string>
     <string name="menu_bookmark_add">Add bookmark</string>
-    <string name="menu_bookmark_remove">Remove bookmark</string>
     <string name="menu_bookmark_list">Bookmark list</string>
     <string name="menu_keep_on">Keep screen on</string>
     <string name="menu_night">Night filter</string>
@@ -93,13 +104,22 @@
     <string name="menu_prev_chapter">Previous chapter</string>
     <string name="menu_reader_settings">Reader settings</string>
     <string name="menu_filters">Page filter</string>
-    <string name="menu_tap_zones">Tap zones</string>
     <string name="menu_page_spacing">Page spacing</string>
     <string name="menu_brightness">Brightness</string>
     <string name="menu_spread">Two-page spread</string>
-    <string name="menu_thumbnails">Page thumbnails</string>
     <string name="menu_crop">Crop page</string>
     <string name="menu_auto_crop">Auto-crop margins</string>
+    <string name="menu_chapters">Chapter list…</string>
+    <string name="menu_auto_scroll">Auto-scroll</string>
+    <string name="menu_auto_speed">Auto-scroll speed…</string>
+    <string name="auto_speed_value">Auto-scroll speed: %1$d / 10</string>
+    <string name="menu_share_page">Share this page</string>
+    <string name="menu_save_page">Save page to gallery</string>
+    <string name="page_saved">Saved to Pictures/ComicReader</string>
+    <string name="menu_remember_series">Remember layout for this folder</string>
+    <string name="series_saved">Mode, direction, fit and spread are now remembered for this folder</string>
+    <string name="series_cleared">This folder now uses the default layout</string>
+    <string name="chapters_title">Chapters</string>
 
     <string name="reading_ltr">Left to right</string>
     <string name="reading_rtl">Right to left</string>
@@ -122,7 +142,6 @@
     <string name="clear">Clear</string>
     <string name="close">Close</string>
     <string name="save">Save</string>
-    <string name="apply">Apply</string>
 
     <string name="chapter_end_title">End of chapter</string>
     <string name="chapter_end_msg">You finished “%1$s”.</string>
@@ -131,9 +150,7 @@
     <string name="no_next_chapter">No next chapter in this folder</string>
     <string name="no_prev_chapter">No previous chapter in this folder</string>
     <string name="finished_last_chapter">That was the last chapter in this folder</string>
-    <string name="opening_next_in">Opening next chapter…</string>
 
-    <string name="str_fit_screen">Fit screen</string>
     <string name="str_filter_none">None</string>
     <string name="str_filter_invert">Invert</string>
     <string name="str_filter_grayscale">Grayscale</string>
@@ -148,7 +165,6 @@
     <string name="crop_failed">Could not save the crop</string>
     <string name="pages_title">Pages</string>
     <string name="error_load">Could not load the page</string>
-    <string name="error_load_book">Could not open this book</string>
     <string name="menu_two_page">Two-page spread</string>
     <string name="menu_pages">Page thumbnails</string>
 
@@ -161,7 +177,6 @@
     <string name="pref_cat_cache">Storage &amp; cache</string>
 
     <string name="pref_theme">Theme</string>
-    <string name="pref_dynamic_color">Use system wallpaper colors</string>
     <string name="pref_language">Language</string>
     <string name="pref_charset">Archive filename charset</string>
 
@@ -194,6 +209,20 @@
     <string name="pref_list_statusbar">Show status bar in the library</string>
     <string name="pref_list_quickfab">Show the list/grid button</string>
 
+    <string name="pref_cat_data">Your data</string>
+    <string name="pref_auto_crop_desc">Trim blank borders in paged and vertical modes</string>
+    <string name="pref_per_series">Per-folder layout</string>
+    <string name="pref_per_series_desc">Let the reader menu remember mode, direction, fit and spread for a folder</string>
+    <string name="pref_preload">Preload pages</string>
+    <string name="pref_auto_speed">Auto-scroll speed</string>
+    <string name="pref_backup">Export backup</string>
+    <string name="pref_backup_desc">Favorites, history, bookmarks, read marks, statistics and settings</string>
+    <string name="pref_restore">Restore backup</string>
+    <string name="pref_restore_desc">Replaces the current library with the contents of a backup file</string>
+    <string name="backup_done">Backup saved</string>
+    <string name="restore_done">Backup restored</string>
+    <string name="restore_failed">That file is not a ComicReader backup</string>
+    <string name="restore_confirm">Replace your favorites, history, bookmarks and settings with this backup?</string>
     <string name="pref_clear_history">Clear reading history</string>
     <string name="pref_clear_bookmarks">Clear all bookmarks</string>
     <string name="pref_clear_thumbs">Clear thumbnail cache</string>
@@ -212,7 +241,6 @@
     <string name="about_credits">Archive support by junrar and Apache Commons Compress. PDF rendering via the Android platform PdfRenderer. Icons by Material Symbols.</string>
     <string name="about_tagline">Read without the noise.</string>
     <string name="about_license">Free and open source software, released under the MIT License.</string>
-    <string name="about_nightly">Version %1$s</string>
 
     <!-- ===================== Arrays ===================== -->
     <string-array name="sort_entries">
@@ -321,16 +349,6 @@
         <item>stretch</item>
     </string-array>
 
-    <string-array name="orient_entries">
-        <item>@string/orientation_default</item>
-        <item>@string/orientation_portrait</item>
-        <item>@string/orientation_landscape</item>
-    </string-array>
-    <string-array name="orient_values">
-        <item>default</item>
-        <item>portrait</item>
-        <item>landscape</item>
-    </string-array>
 
     <string-array name="filter_entries">
         <item>@string/str_filter_none</item>
@@ -361,6 +379,21 @@
         <item>3</item>
         <item>4</item>
         <item>5</item>
+        <item>6</item>
+    </string-array>
+
+    <string-array name="preload_entries">
+        <item>Off</item>
+        <item>1 page</item>
+        <item>2 pages</item>
+        <item>4 pages</item>
+        <item>6 pages</item>
+    </string-array>
+    <string-array name="preload_values">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+        <item>4</item>
         <item>6</item>
     </string-array>
 </resources>

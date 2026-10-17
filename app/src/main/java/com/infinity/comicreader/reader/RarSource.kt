@@ -1,4 +1,4 @@
-﻿package com.infinity.comicreader.reader
+package com.infinity.comicreader.reader
 
 import android.graphics.Bitmap
 import android.util.Log
@@ -13,11 +13,15 @@ import java.io.IOException
 class RarSource(file: File) : PageSource {
     private val archive = Archive(file)
 
-    private val headers: List<FileHeader> = archive.fileHeaders
-        .filter { !it.isDirectory && Formats.isImageName(it.fileName) }
-        .sortedWith { a, b -> NaturalOrder.compare(a.fileName, b.fileName) }
+    private val headers: List<FileHeader> = try {
+        archive.fileHeaders
+            .filter { !it.isDirectory && Formats.isImageName(it.fileName) }
+            .sortedWith { a, b -> NaturalOrder.compare(a.fileName, b.fileName) }
+    } catch (t: Throwable) {
+        runCatching { archive.close() }
+        throw t
+    }
 
-    override val title: String = file.name
     override val pageCount: Int get() = headers.size
 
     /**

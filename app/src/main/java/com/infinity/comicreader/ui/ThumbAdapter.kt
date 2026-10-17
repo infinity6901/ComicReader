@@ -1,4 +1,4 @@
-﻿package com.infinity.comicreader.ui
+package com.infinity.comicreader.ui
 
 import android.graphics.Bitmap
 import android.util.Log
@@ -12,9 +12,12 @@ import com.infinity.comicreader.R
 import com.infinity.comicreader.reader.PageSource
 import com.infinity.comicreader.util.AppDispatchers
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 /** Grid of downsampled page thumbnails used to jump to a page. */
@@ -27,8 +30,13 @@ class ThumbAdapter(
     private val scope = CoroutineScope(SupervisorJob() + AppDispatchers.main)
     private val cache = object : LruCache<Int, Bitmap>(100) {}
 
+    /** Archives are not safe for many parallel reads; a few at a time is plenty for thumbnails. */
+    private val gate = Semaphore(2)
+
     class Holder(val root: View, val image: com.google.android.material.imageview.ShapeableImageView, val label: TextView) :
-        RecyclerView.ViewHolder(root)
+        RecyclerView.ViewHolder(root) {
+        var job: Job? = null
+    }
 
     override fun getItemCount(): Int = source.pageCount
 
@@ -52,6 +60,7 @@ class ThumbAdapter(
             holder.image.strokeWidth = 0f
         }
         holder.root.setOnClickListener { onPick(holder.bindingAdapterPosition) }
+        holder.job?.cancel()
 
         val cached = cache.get(position)
         if (cached != null) {
@@ -59,13 +68,15 @@ class ThumbAdapter(
             return
         }
         holder.image.setImageDrawable(null)
-        scope.launch {
+        holder.job = scope.launch {
             val bitmap = withContext(AppDispatchers.io) {
-                try {
-                    source.loadPage(position, 240, 320)
-                } catch (t: Throwable) {
-                    Log.w(TAG, "Failed to load thumbnail $position", t)
-                    null
+                gate.withPermit {
+                    try {
+                        source.loadPage(position, 240, 320)
+                    } catch (t: Throwable) {
+                        Log.w(TAG, "Failed to load thumbnail $position", t)
+                        null
+                    }
                 }
             }
             if (bitmap != null) {
@@ -75,6 +86,13 @@ class ThumbAdapter(
                 }
             }
         }
+    }
+
+    override fun onViewRecycled(holder: Holder) {
+        super.onViewRecycled(holder)
+        holder.job?.cancel()
+        holder.job = null
+        holder.image.setImageDrawable(null)
     }
 
     fun release() {

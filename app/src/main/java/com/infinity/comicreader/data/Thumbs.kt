@@ -20,6 +20,7 @@ import java.security.MessageDigest
 object Thumbs {
     private const val DISK_DIR = "thumbnails"
     private const val THUMB_CAP_PIXELS = 4_000_000L
+    private const val MAX_DISK_BYTES = 120L * 1024 * 1024
     private const val HEX_DIGITS = "0123456789abcdef"
 
     private val memory = object : LruCache<String, Bitmap>(maxBytes()) {
@@ -55,6 +56,21 @@ object Thumbs {
             disk.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 88, it) }
         }
         return bitmap
+    }
+
+    /**
+     * Keeps the on-disk cover cache under [maxBytes] by deleting the least recently written
+     * files first. Without this the cache only ever grows.
+     */
+    fun trim(context: Context, maxBytes: Long = MAX_DISK_BYTES) {
+        val files = File(context.cacheDir, DISK_DIR).listFiles() ?: return
+        var total = files.sumOf { it.length() }
+        if (total <= maxBytes) return
+        for (f in files.sortedBy { it.lastModified() }) {
+            if (total <= maxBytes) break
+            val size = f.length()
+            if (f.delete()) total -= size
+        }
     }
 
     fun clear(context: Context) {

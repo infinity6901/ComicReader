@@ -1,9 +1,10 @@
-﻿package com.infinity.comicreader.ui
+package com.infinity.comicreader.ui
 
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.provider.OpenableColumns
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -23,6 +24,9 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -37,8 +41,12 @@ import com.infinity.comicreader.data.HistoryItem
 import com.infinity.comicreader.data.Library
 import com.infinity.comicreader.data.Prefs
 import com.infinity.comicreader.util.AppDispatchers
+import com.infinity.comicreader.util.FileUtils
 import com.infinity.comicreader.util.Formats
 import com.infinity.comicreader.util.NaturalOrder
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -63,12 +71,15 @@ class ListActivity : AppCompatActivity() {
     private var mode = TAB_BROWSE
     private var query = ""
     private var resumedOnce = false
+    private var deepJob: Job? = null
+    private var deepResults: List<BookEntry>? = null
     private val allEntries = ArrayList<BookEntry>()
     private val shown = ArrayList<BookEntry>()
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
-            if (result.values.all { it }) openStartDirectory()
+            // Only read access is required to browse; write access (old Android) is a bonus.
+            if (result[Manifest.permission.READ_EXTERNAL_STORAGE] == true) openStartDirectory()
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -120,7 +131,7 @@ class ListActivity : AppCompatActivity() {
         fab.visibility = View.GONE
         pathbar.visibility = if (prefs.listPathView) View.VISIBLE else View.GONE
 
-        intent.data?.path?.let { handleIncomingFile(File(it)) }
+        handleIncoming(intent)
 
         if (!hasStorageAccess()) {
             requestStorageAccess()
@@ -131,6 +142,7 @@ class ListActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        applyStatusBarSetting()
         if (!hasStorageAccess() || mode != TAB_BROWSE) return
         if (!resumedOnce) {
             resumedOnce = true
@@ -145,6 +157,16 @@ class ListActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         adapter.release()
+    }
+
+    private fun applyStatusBarSetting() {
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        if (prefs.listStatusBar) {
+            controller.show(WindowInsetsCompat.Type.statusBars())
+        } else {
+            controller.hide(WindowInsetsCompat.Type.statusBars())
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
     }
 
     // ------------------------------------------------------------------ storage
@@ -177,7 +199,15 @@ class ListActivity : AppCompatActivity() {
                 .setNegativeButton(R.string.cancel, null)
                 .show()
         } else {
-            permissionLauncher.launch(arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE))
+            val wanted = if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+                arrayOf(
+                    Manifest.permission.READ_EXTERNAL_STORAGE,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE
+                )
+            } else {
+                arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+            }
+            permissionLauncher.launch(wanted)
         }
     }
 
@@ -214,6 +244,8 @@ class ListActivity : AppCompatActivity() {
     private fun loadDirectory(dir: File, highlight: String? = null) {
         mode = TAB_BROWSE
         currentDir = dir
+        deepJob?.cancel()
+        deepResults = null
         prefs.lastPath = dir.absolutePath
         adapter.highlightPath = highlight
         selectTab(TAB_BROWSE)
@@ -234,33 +266,55 @@ class ListActivity : AppCompatActivity() {
         }
     }
 
+    /** Favorites, read marks and history, loaded once per listing instead of once per row. */
+    private class Snapshot(
+        val favorites: Set<String>,
+        val read: Set<String>,
+        val history: Map<String, HistoryItem>
+    )
+
+    private fun snapshot() = Snapshot(library.favoriteSet(), library.readSet(), library.historyMap())
+
+    /** Items a user would see inside [dir]: sub-folders and openable files, minus hidden ones. */
+    private fun visibleChildren(dir: File): List<File> {
+        val showHidden = prefs.showHidden
+        return dir.listFiles()?.filter {
+            (showHidden || !it.name.startsWith(".")) && (it.isDirectory || Formats.isOpenable(it.name))
+        } ?: emptyList()
+    }
+
     private fun buildDirectoryEntries(dir: File): List<BookEntry> {
         val files = dir.listFiles() ?: return emptyList()
         val showHidden = prefs.showHidden
+        val snap = snapshot()
         val out = ArrayList<BookEntry>(files.size)
         for (f in files) {
             if (!showHidden && f.name.startsWith(".")) continue
             val isDir = f.isDirectory
-            val type = if (isDir) EntryType.FOLDER else Formats.typeOf(f.name)
-            if (!isDir && type == EntryType.OTHER) continue
-            val history = if (isDir) null else library.historyFor(f.absolutePath)
-            out.add(
-                BookEntry(
-                    file = f,
-                    name = f.name,
-                    isDir = isDir,
-                    type = type,
-                    size = if (isDir) 0 else f.length(),
-                    lastModified = f.lastModified(),
-                    childCount = if (isDir) (f.listFiles()?.size ?: 0) else -1,
-                    pages = history?.total ?: -1,
-                    progressPage = history?.page ?: -1,
-                    favorite = library.isFavorite(f.absolutePath),
-                    read = library.isRead(f.absolutePath)
-                )
-            )
+            if (!isDir && Formats.typeOf(f.name) == EntryType.OTHER) continue
+            out.add(entryFor(f, snap))
         }
         return out
+    }
+
+    private fun entryFor(file: File, snap: Snapshot): BookEntry {
+        val isDir = file.isDirectory
+        val history = if (isDir) null else snap.history[file.absolutePath]
+        val children = if (isDir) visibleChildren(file) else null
+        return BookEntry(
+            file = file,
+            name = file.name,
+            isDir = isDir,
+            type = if (isDir) EntryType.FOLDER else Formats.typeOf(file.name),
+            size = if (isDir) 0 else file.length(),
+            lastModified = file.lastModified(),
+            childCount = children?.size ?: -1,
+            readCount = children?.count { it.absolutePath in snap.read } ?: -1,
+            pages = history?.total ?: -1,
+            progressPage = history?.page ?: -1,
+            favorite = file.absolutePath in snap.favorites,
+            read = file.absolutePath in snap.read
+        )
     }
 
     private fun showFavorites() {
@@ -274,7 +328,8 @@ class ListActivity : AppCompatActivity() {
         showProgress(true)
         lifecycleScope.launch {
             val list = withContext(AppDispatchers.io) {
-                library.favorites().map { entryFor(File(it)) }
+                val snap = snapshot()
+                library.favorites().map { entryFor(File(it), snap) }
             }
             progress.visibility = View.GONE
             displayEntries(list)
@@ -291,7 +346,10 @@ class ListActivity : AppCompatActivity() {
         invalidateOptionsMenu()
         showProgress(true)
         lifecycleScope.launch {
-            val list = withContext(AppDispatchers.io) { library.history().map { entryForHistory(it) } }
+            val list = withContext(AppDispatchers.io) {
+                val snap = snapshot()
+                library.history().map { entryForHistory(it, snap) }
+            }
             progress.visibility = View.GONE
             displayEntries(list)
         }
@@ -307,31 +365,16 @@ class ListActivity : AppCompatActivity() {
         invalidateOptionsMenu()
         showProgress(true)
         lifecycleScope.launch {
-            val list = withContext(AppDispatchers.io) { library.bookmarks().map { entryForBookmark(it) } }
+            val list = withContext(AppDispatchers.io) {
+                val snap = snapshot()
+                library.bookmarks().map { entryForBookmark(it, snap) }
+            }
             progress.visibility = View.GONE
             displayEntries(list)
         }
     }
 
-    private fun entryFor(file: File): BookEntry {
-        val isDir = file.isDirectory
-        val history = if (isDir) null else library.historyFor(file.absolutePath)
-        return BookEntry(
-            file = file,
-            name = file.name,
-            isDir = isDir,
-            type = if (isDir) EntryType.FOLDER else Formats.typeOf(file.name),
-            size = if (isDir) 0 else file.length(),
-            lastModified = file.lastModified(),
-            childCount = if (isDir) (file.listFiles()?.size ?: 0) else -1,
-            pages = history?.total ?: -1,
-            progressPage = history?.page ?: -1,
-            favorite = library.isFavorite(file.absolutePath),
-            read = library.isRead(file.absolutePath)
-        )
-    }
-
-    private fun entryForHistory(item: HistoryItem): BookEntry {
+    private fun entryForHistory(item: HistoryItem, snap: Snapshot): BookEntry {
         val file = File(item.path)
         val exists = file.exists()
         return BookEntry(
@@ -343,15 +386,14 @@ class ListActivity : AppCompatActivity() {
             lastModified = item.time,
             pages = item.total,
             progressPage = item.page,
-            favorite = library.isFavorite(item.path),
-            read = library.isRead(item.path),
+            favorite = item.path in snap.favorites,
+            read = item.path in snap.read,
             subtitle = if (!exists) getString(R.string.missing_file) else null
         )
     }
 
-    private fun entryForBookmark(bookmark: com.infinity.comicreader.data.Bookmark): BookEntry {
+    private fun entryForBookmark(bookmark: com.infinity.comicreader.data.Bookmark, snap: Snapshot): BookEntry {
         val file = File(bookmark.path)
-        val history = library.historyFor(bookmark.path)
         return BookEntry(
             file = file,
             name = file.name.ifEmpty { bookmark.name },
@@ -359,10 +401,10 @@ class ListActivity : AppCompatActivity() {
             type = Formats.typeOf(file.name),
             size = 0,
             lastModified = bookmark.time,
-            pages = history?.total ?: -1,
+            pages = snap.history[bookmark.path]?.total ?: -1,
             progressPage = bookmark.page,
-            favorite = library.isFavorite(bookmark.path),
-            read = library.isRead(bookmark.path),
+            favorite = bookmark.path in snap.favorites,
+            read = bookmark.path in snap.read,
             subtitle = getString(R.string.page_number, bookmark.page + 1)
         )
     }
@@ -371,11 +413,16 @@ class ListActivity : AppCompatActivity() {
         allEntries.clear()
         allEntries.addAll(list)
         applyFilterAndSort()
+        if (query.isNotBlank()) scheduleDeepSearch()
     }
 
     private fun applyFilterAndSort() {
-        val filtered = if (query.isBlank()) allEntries
-        else allEntries.filter { it.name.contains(query, ignoreCase = true) }
+        val deep = deepResults
+        val filtered = when {
+            query.isBlank() -> allEntries
+            deep != null -> deep
+            else -> allEntries.filter { it.name.contains(query, ignoreCase = true) }
+        }
 
         var byField: Comparator<BookEntry> = when (prefs.listSort) {
             "size" -> compareBy { it.size }
@@ -446,8 +493,9 @@ class ListActivity : AppCompatActivity() {
                 else toast(R.string.open_location_failed)
             }
             Formats.isOpenable(entry.name) -> {
-                val page = if (mode == TAB_FAVORITES) library.pageFor(entry.path) else 0
-                openViewer(entry.file, page)
+                // "Resume where I left off" applies everywhere, but a finished book starts over.
+                val resume = prefs.resume && !library.isRead(entry.path)
+                openViewer(entry.file, if (resume) library.pageFor(entry.path) else 0)
             }
             else -> toast(R.string.error_open)
         }
@@ -477,7 +525,11 @@ class ListActivity : AppCompatActivity() {
             add(if (favorite) getString(R.string.menu_remove_favorite) else getString(R.string.menu_add_favorite)) {
                 toggleFavorite(path)
             }
-            if (!entry.isDir) {
+            if (entry.isDir) {
+                add(getString(R.string.menu_continue)) { continueReading(entry.file) }
+                add(getString(R.string.menu_mark_all_read)) { markFolder(entry.file, true) }
+                add(getString(R.string.menu_mark_all_unread)) { markFolder(entry.file, false) }
+            } else {
                 val read = library.isRead(path)
                 add(if (read) getString(R.string.menu_mark_unread) else getString(R.string.menu_mark_read)) {
                     library.setRead(path, !read)
@@ -565,8 +617,14 @@ class ListActivity : AppCompatActivity() {
             .setPositiveButton(R.string.save) { _, _ ->
                 val name = input.text.toString().trim()
                 if (name.isEmpty() || name == file.name) return@setPositiveButton
+                if (!FileUtils.isSafeName(name)) {
+                    toast(R.string.invalid_name)
+                    return@setPositiveButton
+                }
                 val target = File(file.parentFile, name)
-                val ok = runCatching { file.renameTo(target) }.getOrDefault(false)
+                // renameTo silently replaces an existing file, so refuse to.
+                val ok = !target.exists() && runCatching { file.renameTo(target) }.getOrDefault(false)
+                if (ok) library.replacePath(file.absolutePath, target.absolutePath)
                 toast(if (ok) R.string.renamed else R.string.rename_failed)
                 refreshCurrent()
             }
@@ -579,13 +637,15 @@ class ListActivity : AppCompatActivity() {
             .setTitle(R.string.delete_confirm_title)
             .setMessage(R.string.delete_confirm_msg)
             .setPositiveButton(R.string.delete) { _, _ ->
-                val ok = runCatching { file.deleteRecursively() }.getOrDefault(false)
-                if (ok) {
-                    library.removeFavorite(file.absolutePath)
-                    library.removeHistory(file.absolutePath)
-                    toast(getString(R.string.deleted_format, 1))
+                lifecycleScope.launch {
+                    val ok = withContext(AppDispatchers.io) {
+                        runCatching { FileUtils.deleteTree(file) }.getOrDefault(false)
+                    }
+                    // Even a partial failure may have removed some files: forget what is gone.
+                    if (!file.exists()) library.removePathsUnder(file.absolutePath)
+                    toast(if (ok) getString(R.string.deleted_format, 1) else getString(R.string.op_failed))
+                    refreshCurrent()
                 }
-                refreshCurrent()
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
@@ -604,7 +664,11 @@ class ListActivity : AppCompatActivity() {
             .setPositiveButton(R.string.ok) { _, _ ->
                 val name = input.text.toString().trim()
                 if (name.isEmpty()) return@setPositiveButton
-                val created = File(dir, name).mkdirs()
+                if (!FileUtils.isSafeName(name)) {
+                    toast(R.string.invalid_name)
+                    return@setPositiveButton
+                }
+                val created = File(dir, name).mkdir()
                 toast(if (created) R.string.folder_created else R.string.error_open)
                 refreshCurrent()
             }
@@ -629,6 +693,7 @@ class ListActivity : AppCompatActivity() {
     }
 
     private fun handleIncomingFile(file: File) {
+        if (!isUnderStorage(file)) return
         if (file.isFile && Formats.isOpenable(file.name)) {
             openViewer(file, 0)
         } else if (file.isDirectory) {
@@ -636,10 +701,140 @@ class ListActivity : AppCompatActivity() {
         }
     }
 
+    /** Only shared storage may be opened by path: never the app's own or other private folders. */
+    private fun isUnderStorage(file: File): Boolean {
+        val path = runCatching { file.canonicalPath }.getOrNull() ?: return false
+        val root = Environment.getExternalStorageDirectory().canonicalPath
+        return path == root || path.startsWith("$root/") || path.startsWith("/storage/")
+    }
+
+    private fun handleIncoming(intent: Intent) {
+        val uri = intent.data ?: return
+        when (uri.scheme) {
+            "file" -> uri.path?.let { handleIncomingFile(File(it)) }
+            "content" -> openSharedContent(uri)
+        }
+    }
+
+    /** Another app handed us a content:// URI: copy it into the cache and open the copy. */
+    private fun openSharedContent(uri: Uri) {
+        showProgress(true)
+        lifecycleScope.launch {
+            val copy = withContext(AppDispatchers.io) { copyToCache(uri) }
+            progress.visibility = View.GONE
+            if (copy != null) openViewer(copy, 0) else toast(R.string.error_open)
+        }
+    }
+
+    private fun copyToCache(uri: Uri): File? {
+        val name = runCatching {
+            contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+                if (it.moveToFirst()) it.getString(0) else null
+            }
+        }.getOrNull() ?: uri.lastPathSegment
+        val safe = name?.let { File(it).name }
+        if (safe == null || !FileUtils.isSafeName(safe) || !Formats.isOpenable(safe)) return null
+
+        val dir = File(cacheDir, INCOMING_DIR)
+        FileUtils.deleteTree(dir) // keep only the file being read
+        if (!dir.mkdirs()) return null
+        val out = File(dir, safe)
+        return try {
+            val input = contentResolver.openInputStream(uri) ?: return null
+            input.use { source ->
+                out.outputStream().use { sink ->
+                    val buffer = ByteArray(64 * 1024)
+                    var total = 0L
+                    while (true) {
+                        val n = source.read(buffer)
+                        if (n < 0) break
+                        total += n
+                        if (total > MAX_INCOMING_BYTES) throw java.io.IOException("File is too large")
+                        sink.write(buffer, 0, n)
+                    }
+                }
+            }
+            out
+        } catch (e: java.io.IOException) {
+            out.delete()
+            null
+        }
+    }
+
+    // ------------------------------------------------------------------ continue / mark
+
+    private fun continueReading(dir: File) {
+        lifecycleScope.launch {
+            val target = withContext(AppDispatchers.io) { pickContinue(dir) }
+            if (target == null) toast(R.string.continue_none) else openViewer(target.first, target.second)
+        }
+    }
+
+    /**
+     * What to read next in [dir]: the most recently read book if it is unfinished, else the
+     * first unread book after it, else the first unread book.
+     */
+    private fun pickContinue(dir: File): Pair<File, Int>? {
+        val books = dir.listFiles()
+            ?.filter { it.isFile && !it.name.startsWith(".") && Formats.isOpenable(it.name) }
+            ?.sortedWith(compareBy(NaturalOrder) { it.name })
+            ?: return null
+        if (books.isEmpty()) return null
+        val history = library.historyMap()
+        val read = library.readSet()
+        val last = books.filter { it.absolutePath in history }
+            .maxByOrNull { history.getValue(it.absolutePath).time }
+        if (last != null) {
+            val page = history.getValue(last.absolutePath).page
+            if (page > 0 && last.absolutePath !in read) return last to page
+            books.drop(books.indexOf(last) + 1).firstOrNull { it.absolutePath !in read }
+                ?.let { return it to 0 }
+        }
+        return books.firstOrNull { it.absolutePath !in read }?.let { it to 0 }
+    }
+
+    private fun markFolder(dir: File, read: Boolean) {
+        lifecycleScope.launch {
+            withContext(AppDispatchers.io) {
+                val paths = dir.listFiles()
+                    ?.filter { it.isFile && Formats.isOpenable(it.name) }
+                    ?.map { it.absolutePath }
+                    .orEmpty()
+                library.setReadMany(paths, read)
+            }
+            toast(if (read) R.string.marked_read else R.string.marked_unread)
+            refreshCurrent()
+        }
+    }
+
+    private fun showStats() {
+        val st = library.stats()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.menu_stats)
+            .setMessage(
+                getString(
+                    R.string.stats_body, st.chapters, st.pages, st.seconds / 3600,
+                    (st.seconds % 3600) / 60, st.daysRead, st.streak, st.bestStreak
+                )
+            )
+            .setPositiveButton(R.string.ok, null)
+            .setNeutralButton(R.string.reset_stats) { _, _ -> library.clearStats() }
+            .show()
+    }
+
+    private fun openCleanup(cleanupMode: String) {
+        val root = currentDir ?: Environment.getExternalStorageDirectory()
+        startActivity(
+            Intent(this, CleanupActivity::class.java)
+                .putExtra(CleanupActivity.EXTRA_MODE, cleanupMode)
+                .putExtra(CleanupActivity.EXTRA_ROOT, root.absolutePath)
+        )
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        intent.data?.path?.let { handleIncomingFile(File(it)) }
+        handleIncoming(intent)
     }
 
     // ------------------------------------------------------------------ menu
@@ -664,8 +859,43 @@ class ListActivity : AppCompatActivity() {
     /** Filters and re-sorts the list for [q], live as the user types and on submit. */
     private fun applyQuery(q: String?): Boolean {
         query = q.orEmpty()
+        deepJob?.cancel()
+        deepResults = null
         applyFilterAndSort()
+        scheduleDeepSearch()
         return true
+    }
+
+    /** With "search subfolders" on, looks below the current folder once typing pauses. */
+    private fun scheduleDeepSearch() {
+        val dir = currentDir
+        val text = query.trim()
+        if (!prefs.deepSearch || mode != TAB_BROWSE || dir == null || text.length < 2) return
+        deepJob?.cancel()
+        deepJob = lifecycleScope.launch {
+            delay(DEEP_SEARCH_DELAY_MS)
+            val found = withContext(AppDispatchers.io) { deepSearch(dir, text) { isActive } }
+            deepResults = found
+            applyFilterAndSort()
+        }
+    }
+
+    private fun deepSearch(root: File, text: String, alive: () -> Boolean): List<BookEntry> {
+        val showHidden = prefs.showHidden
+        val snap = snapshot()
+        val rootPath = root.absolutePath
+        return root.walkTopDown()
+            .maxDepth(DEEP_SEARCH_DEPTH)
+            .onEnter { showHidden || !it.name.startsWith(".") }
+            .takeWhile { alive() }
+            .filter { it != root && it.name.contains(text, ignoreCase = true) }
+            .filter { it.isDirectory || Formats.isOpenable(it.name) }
+            .take(DEEP_SEARCH_LIMIT)
+            .map { f ->
+                val where = f.parentFile?.absolutePath?.removePrefix(rootPath)?.trimStart('/').orEmpty()
+                entryFor(f, snap).copy(subtitle = where.ifEmpty { f.parentFile?.name.orEmpty() })
+            }
+            .toList()
     }
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
@@ -684,6 +914,15 @@ class ListActivity : AppCompatActivity() {
                     R.string.menu_remove_favorite else R.string.menu_add_favorite
             )
         menu.findItem(R.id.menu_new_folder)?.isVisible = browsing
+        menu.findItem(R.id.menu_continue)?.isVisible = browsing
+        menu.findItem(R.id.menu_mark_all_read)?.isVisible = browsing
+        menu.findItem(R.id.menu_mark_all_unread)?.isVisible = browsing
+        menu.findItem(R.id.menu_dupes)?.isVisible = browsing
+        menu.findItem(R.id.menu_large)?.isVisible = browsing
+        menu.findItem(R.id.menu_search_deep)?.apply {
+            isVisible = browsing
+            isChecked = prefs.deepSearch
+        }
         menu.findItem(R.id.menu_sort_dir)?.isVisible =
             mode == TAB_BROWSE || mode == TAB_FAVORITES
         return super.onPrepareOptionsMenu(menu)
@@ -701,6 +940,20 @@ class ListActivity : AppCompatActivity() {
                 refreshCurrent()
             }
             R.id.menu_new_folder -> newFolder()
+            R.id.menu_continue -> currentDir?.let { continueReading(it) }
+            R.id.menu_mark_all_read -> currentDir?.let { markFolder(it, true) }
+            R.id.menu_mark_all_unread -> currentDir?.let { markFolder(it, false) }
+            R.id.menu_search_deep -> {
+                prefs.deepSearch = !prefs.deepSearch
+                deepJob?.cancel()
+                deepResults = null
+                invalidateOptionsMenu()
+                applyFilterAndSort()
+                scheduleDeepSearch()
+            }
+            R.id.menu_stats -> showStats()
+            R.id.menu_dupes -> openCleanup(CleanupActivity.MODE_DUPES)
+            R.id.menu_large -> openCleanup(CleanupActivity.MODE_LARGE)
             R.id.menu_add_favorite -> toggleFavorite(currentDir?.absolutePath)
             R.id.menu_refresh -> refreshCurrent()
             R.id.menu_settings -> startActivity(Intent(this, SettingsActivity::class.java))
@@ -793,5 +1046,10 @@ class ListActivity : AppCompatActivity() {
         private const val TAB_FAVORITES = 1
         private const val TAB_HISTORY = 2
         private const val TAB_BOOKMARKS = 3
+        private const val INCOMING_DIR = "incoming"
+        private const val MAX_INCOMING_BYTES = 2L * 1024 * 1024 * 1024
+        private const val DEEP_SEARCH_DELAY_MS = 300L
+        private const val DEEP_SEARCH_DEPTH = 8
+        private const val DEEP_SEARCH_LIMIT = 500
     }
 }

@@ -1,4 +1,4 @@
-﻿package com.infinity.comicreader.ui
+package com.infinity.comicreader.ui
 
 import android.content.res.ColorStateList
 import android.graphics.drawable.GradientDrawable
@@ -23,6 +23,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 /**
@@ -42,6 +44,9 @@ class BookAdapter(
     private val items = ArrayList<BookEntry>()
     private val scope = CoroutineScope(SupervisorJob() + AppDispatchers.main)
 
+    /** Caps concurrent cover decodes; a row scrolled away before its turn is never decoded. */
+    private val gate = Semaphore(THUMB_THREADS)
+
     /** Path to draw a focus ring around, used after "open file location". */
     var highlightPath: String? = null
 
@@ -50,8 +55,6 @@ class BookAdapter(
         items.addAll(list)
         notifyDataSetChanged()
     }
-
-    fun currentItems(): List<BookEntry> = items
 
     class BookHolder(view: View) : RecyclerView.ViewHolder(view) {
         val card: MaterialCardView? = view as? MaterialCardView
@@ -113,7 +116,9 @@ class BookAdapter(
             val target = position
             holder.job = scope.launch {
                 val bitmap = withContext(AppDispatchers.io) {
-                    runCatching { Thumbs.load(appContext, item, charset, reqW, reqH) }.getOrNull()
+                    gate.withPermit {
+                        runCatching { Thumbs.load(appContext, item, charset, reqW, reqH) }.getOrNull()
+                    }
                 }
                 if (bitmap != null && holder.bindingAdapterPosition == target) {
                     holder.thumb.setImageBitmap(bitmap)
@@ -153,8 +158,9 @@ class BookAdapter(
     private fun bindBadge(badge: TextView, item: BookEntry) {
         val context = badge.context
         val hasProgress = item.pages > 0 && item.progressPage > 0
+        val folderDone = item.isDir && item.childCount > 0 && item.readCount >= item.childCount
         when {
-            item.read -> {
+            item.read || folderDone -> {
                 badge.visibility = View.VISIBLE
                 badge.text = context.getString(R.string.read_badge)
                 setPill(badge, R.color.md_secondary, R.color.md_on_secondary)
@@ -180,7 +186,11 @@ class BookAdapter(
 
     private fun subtitleFor(context: android.content.Context, item: BookEntry): String {
         if (item.isDir) {
-            return if (item.childCount >= 0) context.getString(R.string.books_count, item.childCount) else ""
+            return when {
+                item.childCount < 0 -> ""
+                item.readCount > 0 -> context.getString(R.string.folder_read_summary, item.childCount, item.readCount)
+                else -> context.getString(R.string.books_count, item.childCount)
+            }
         }
         val size = FileUtils.formatSize(context, item.size)
         return if (item.pages > 0) {
@@ -208,4 +218,8 @@ class BookAdapter(
             else -> R.color.md_on_surface_variant
         }
     )
+
+    private companion object {
+        const val THUMB_THREADS = 3
+    }
 }

@@ -1,4 +1,4 @@
-﻿package com.infinity.comicreader.ui
+package com.infinity.comicreader.ui
 
 import android.content.Context
 import android.graphics.Bitmap

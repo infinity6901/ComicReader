@@ -2,10 +2,6 @@
 <resources>
 
     <!-- ================= Brand ================= -->
-    <color name="brand_indigo">#4F46E5</color>
-    <color name="brand_violet">#7C3AED</color>
-    <color name="brand_amber">#F59E0B</color>
-    <color name="brand_teal">#0D9488</color>
 
     <!-- ================= Material 3 — light ================= -->
     <color name="md_primary">#4F46E5</color>
@@ -49,20 +45,16 @@
     <color name="md_inverse_on_surface">#F1F0F7</color>
     <color name="md_inverse_primary">#C0C1FF</color>
 
-    <color name="md_scrim">#000000</color>
 
     <!-- ================= Semantic extras ================= -->
     <!-- Reader is always pure black for maximum contrast, in both themes. -->
     <color name="reader_bg">#FF000000</color>
     <color name="reader_bar">#E6101014</color>
-    <color name="reader_scrim">#B3000000</color>
     <color name="night_overlay">#66000000</color>
 
     <color name="reader_card">#F21C1B22</color>
     <color name="reader_on_surface_dim">#B3FFFFFF</color>
 
     <color name="star_active">#F59E0B</color>
-    <color name="badge_bg">#1F000000</color>
-    <color name="thumbnail_placeholder">#E9E7F0</color>
 
 </resources>

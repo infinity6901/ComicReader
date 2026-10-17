@@ -7,24 +7,18 @@
     <dimen name="space_4">16dp</dimen>
     <dimen name="space_5">20dp</dimen>
     <dimen name="space_6">24dp</dimen>
-    <dimen name="space_8">32dp</dimen>
-    <dimen name="space_12">48dp</dimen>
 
     <!-- Shape scale -->
-    <dimen name="corner_xs">6dp</dimen>
     <dimen name="corner_sm">10dp</dimen>
     <dimen name="corner_md">14dp</dimen>
     <dimen name="corner_lg">20dp</dimen>
-    <dimen name="corner_xl">28dp</dimen>
 
     <!-- List / grid -->
     <dimen name="list_thumb_w">54dp</dimen>
     <dimen name="list_thumb_h">72dp</dimen>
     <dimen name="grid_thumb_h">168dp</dimen>
-    <dimen name="grid_spacing">10dp</dimen>
     <dimen name="list_side_padding">12dp</dimen>
 
     <!-- Reader -->
-    <dimen name="reader_bar_height">56dp</dimen>
     <dimen name="reader_indicator_min_w">84dp</dimen>
 </resources>

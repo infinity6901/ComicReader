@@ -108,6 +108,30 @@
             app:defaultValue="false"
             app:key="pref_two_page"
             app:title="@string/pref_two_page" />
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:key="pref_auto_crop"
+            app:summary="@string/pref_auto_crop_desc"
+            app:title="@string/menu_auto_crop" />
+        <SwitchPreferenceCompat
+            app:defaultValue="true"
+            app:key="pref_per_series"
+            app:summary="@string/pref_per_series_desc"
+            app:title="@string/pref_per_series" />
+        <ListPreference
+            app:defaultValue="2"
+            app:entries="@array/preload_entries"
+            app:entryValues="@array/preload_values"
+            app:key="pref_preload"
+            app:title="@string/pref_preload"
+            app:useSimpleSummaryProvider="true" />
+        <SeekBarPreference
+            android:max="10"
+            app:defaultValue="5"
+            app:key="pref_auto_speed"
+            app:min="1"
+            app:showSeekBarValue="true"
+            app:title="@string/pref_auto_speed" />
     </PreferenceCategory>
 
     <PreferenceCategory app:title="@string/pref_cat_gestures">
@@ -164,6 +188,20 @@
             app:key="pref_sort_dir"
             app:title="@string/pref_sort_dir"
             app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="@string/pref_cat_data">
+        <Preference
+            app:key="pref_stats"
+            app:title="@string/menu_stats" />
+        <Preference
+            app:key="pref_backup"
+            app:summary="@string/pref_backup_desc"
+            app:title="@string/pref_backup" />
+        <Preference
+            app:key="pref_restore"
+            app:summary="@string/pref_restore_desc"
+            app:title="@string/pref_restore" />
     </PreferenceCategory>
 
     <PreferenceCategory app:title="@string/pref_cat_cache">

@@ -1,4 +1,4 @@
-﻿package com.infinity.comicreader.data
+package com.infinity.comicreader.data
 
 import java.io.File
 
@@ -22,6 +22,8 @@ data class BookEntry(
     val progressPage: Int = -1,
     val favorite: Boolean = false,
     val read: Boolean = false,
+    /** For folders: how many direct children are already marked read (-1 = unknown). */
+    val readCount: Int = -1,
     val subtitle: String? = null
 ) {
     val path: String get() = file.absolutePath
@@ -41,4 +43,22 @@ data class Bookmark(
     val page: Int,
     val note: String,
     val time: Long
+)
+
+/** Reader options remembered for one folder ("series"). */
+data class SeriesSettings(
+    val mode: String,
+    val dir: String,
+    val fit: String,
+    val twoPage: Boolean
+)
+
+/** Aggregated reading statistics. */
+data class ReadingStats(
+    val seconds: Long,
+    val pages: Long,
+    val chapters: Int,
+    val daysRead: Int,
+    val streak: Int,
+    val bestStreak: Int
 )

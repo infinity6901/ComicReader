@@ -1,4 +1,4 @@
-﻿package com.infinity.comicreader.util
+package com.infinity.comicreader.util
 
 /**
  * Natural ordering comparator: "page2" sorts before "page10", and digit runs are

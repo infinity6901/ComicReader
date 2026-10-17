@@ -156,6 +156,13 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/str_filter_contrast" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chip_filter_sepia"
+                style="@style/Widget.Material3.Chip.Filter"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/str_filter_sepia" />
         </com.google.android.material.chip.ChipGroup>
 
         <!-- Reading direction -->

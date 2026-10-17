@@ -1,4 +1,4 @@
-﻿package com.infinity.comicreader.ui
+package com.infinity.comicreader.ui
 
 import android.os.Bundle
 import android.widget.TextView

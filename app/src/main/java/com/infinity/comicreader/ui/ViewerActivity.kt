@@ -1,9 +1,16 @@
-﻿package com.infinity.comicreader.ui
+package com.infinity.comicreader.ui
 
+import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.graphics.Bitmap
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
+import android.provider.MediaStore
 import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
@@ -19,6 +26,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
+import androidx.core.content.FileProvider
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
@@ -35,15 +43,20 @@ import com.infinity.comicreader.data.Bookmark
 import com.infinity.comicreader.data.HistoryItem
 import com.infinity.comicreader.data.Library
 import com.infinity.comicreader.data.Prefs
+import com.infinity.comicreader.data.SeriesSettings
 import com.infinity.comicreader.reader.Filters
 import com.infinity.comicreader.reader.PageSource
 import com.infinity.comicreader.reader.PageSources
 import com.infinity.comicreader.util.AppDispatchers
 import com.infinity.comicreader.util.Formats
 import com.infinity.comicreader.util.NaturalOrder
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.BitSet
 
 /**
  * The reader.
@@ -93,6 +106,27 @@ class ViewerActivity : AppCompatActivity() {
     private var nightFilter = false
     private var keepOn = false
     private var barsVisible = true
+    private var fit = "screen"
+    private var autoCrop = false
+
+    /** True when this folder has its own remembered layout (mode, direction, fit, spread). */
+    private var seriesActive = false
+
+    private var openJob: Job? = null
+    private var endDismissed = false
+    private var markedRead = false
+
+    // auto-scroll
+    private val handler = Handler(Looper.getMainLooper())
+    private var autoScrolling = false
+    private var autoRemainder = 0f
+    private var autoLastFrame = 0L
+
+    // reading statistics for the current session
+    private var sessionStart = 0L
+    private val seenPages = BitSet()
+
+    private var cropSource: File? = null
 
     private val cropLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -101,6 +135,7 @@ class ViewerActivity : AppCompatActivity() {
                     toast(getString(R.string.crop_saved, it))
                 }
             }
+            deleteCropSource()
         }
 
     private val pagesLauncher =
@@ -124,6 +159,10 @@ class ViewerActivity : AppCompatActivity() {
 
         // Page-change callbacks are registered once: they outlive adapter swaps.
         pager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageScrollStateChanged(state: Int) {
+                if (state == ViewPager2.SCROLL_STATE_DRAGGING) stopAutoScroll()
+            }
+
             override fun onPageSelected(position: Int) {
                 if (mode != MODE_PAGED) return
                 currentIndex = itemToPage(position)
@@ -132,6 +171,11 @@ class ViewerActivity : AppCompatActivity() {
             }
         })
         vertical.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrollStateChanged(rv: RecyclerView, newState: Int) {
+                // Touching the list takes over from auto-scroll.
+                if (newState == RecyclerView.SCROLL_STATE_DRAGGING) stopAutoScroll()
+            }
+
             override fun onScrolled(rv: RecyclerView, dx: Int, dy: Int) {
                 if (mode == MODE_PAGED) return
                 val lm = rv.layoutManager as? LinearLayoutManager ?: return
@@ -170,7 +214,10 @@ class ViewerActivity : AppCompatActivity() {
 
         endPrev.setOnClickListener { openPrevChapter() }
         endNext.setOnClickListener { openNextChapter() }
-        findViewById<View>(R.id.end_close).setOnClickListener { hideEndCard() }
+        findViewById<View>(R.id.end_close).setOnClickListener {
+            endDismissed = true
+            hideEndCard()
+        }
 
         open()
     }
@@ -178,19 +225,50 @@ class ViewerActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        stopAutoScroll()
+        flushStats()
+        saveHistory()
+        openJob?.cancel()
         closeSource()
+        endDismissed = false
         hideEndCard()
         open()
     }
 
+    override fun onStart() {
+        super.onStart()
+        sessionStart = SystemClock.elapsedRealtime()
+    }
+
     override fun onStop() {
         super.onStop()
+        stopAutoScroll()
         saveHistory()
+        flushStats()
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        stopAutoScroll()
+        openJob?.cancel()
         closeSource()
+        deleteCropSource()
+    }
+
+    /** Adds this session's reading time and newly seen pages to the statistics. */
+    private fun flushStats() {
+        if (sessionStart == 0L) return
+        val seconds = ((SystemClock.elapsedRealtime() - sessionStart) / 1000L)
+            .coerceIn(0L, MAX_SESSION_SECONDS)
+        val pages = seenPages.cardinality()
+        sessionStart = SystemClock.elapsedRealtime()
+        seenPages.clear()
+        if (source != null) library.addReading(seconds, pages)
+    }
+
+    private fun deleteCropSource() {
+        cropSource?.let { runCatching { it.delete() } }
+        cropSource = null
     }
 
     private fun bindViews() {
@@ -215,6 +293,8 @@ class ViewerActivity : AppCompatActivity() {
         mode = prefs.pageMode
         twoPage = prefs.twoPage
         readingDir = prefs.readingDir
+        fit = prefs.fit
+        autoCrop = prefs.autoCrop
         filter = prefs.filter
         brightness = prefs.brightness
         spacingDp = prefs.pageSpacing
@@ -226,6 +306,46 @@ class ViewerActivity : AppCompatActivity() {
         if (prefs.fullscreen) setFullscreen(true)
     }
 
+    /** Applies the folder's remembered layout, if it has one and the feature is on. */
+    private fun applySeries(folder: String) {
+        val saved = if (prefs.perSeries) library.seriesFor(folder) else null
+        seriesActive = saved != null
+        if (saved == null) return
+        mode = saved.mode.takeIf { it == MODE_PAGED || it == MODE_VERTICAL || it == MODE_LONGSTRIP } ?: MODE_PAGED
+        readingDir = if (saved.dir == "rtl") "rtl" else "ltr"
+        fit = saved.fit
+        twoPage = saved.twoPage
+    }
+
+    /**
+     * Stores the layout options: with the folder's own settings when it remembers them,
+     * otherwise as the global defaults.
+     */
+    private fun persistLayout() {
+        val folder = file?.parentFile?.absolutePath
+        if (seriesActive && folder != null) {
+            library.setSeries(folder, SeriesSettings(mode, readingDir, fit, twoPage))
+        } else {
+            prefs.pageMode = mode
+            prefs.readingDir = readingDir
+            prefs.fit = fit
+            prefs.twoPage = twoPage
+        }
+    }
+
+    private fun toggleSeries() {
+        val folder = file?.parentFile?.absolutePath ?: return
+        seriesActive = !seriesActive
+        if (seriesActive) {
+            library.setSeries(folder, SeriesSettings(mode, readingDir, fit, twoPage))
+            toast(R.string.series_saved)
+        } else {
+            library.setSeries(folder, null)
+            toast(R.string.series_cleared)
+        }
+        invalidateOptionsMenu()
+    }
+
     // ------------------------------------------------------------------ loading
 
     private fun open() {
@@ -234,14 +354,28 @@ class ViewerActivity : AppCompatActivity() {
             finish()
             return
         }
-        file = File(path)
-        toolbar.title = chapterLabel(file!!)
+        val target = File(path)
+        file = target
+        toolbar.title = chapterLabel(target)
         progress.visibility = View.VISIBLE
+        markedRead = false
+        mode = prefs.pageMode
+        readingDir = prefs.readingDir
+        fit = prefs.fit
+        twoPage = prefs.twoPage
+        target.parentFile?.absolutePath?.let { applySeries(it) }
 
-        lifecycleScope.launch {
+        openJob = lifecycleScope.launch {
             val (src, siblings) = withContext(AppDispatchers.io) {
-                val s = runCatching { PageSources.open(file!!, prefs.charset) }.getOrNull()
-                s to siblingChapters(file!!)
+                val s = runCatching { PageSources.open(target, prefs.charset) }.getOrNull()
+                try {
+                    ensureActive()
+                } catch (e: CancellationException) {
+                    // A newer open() replaced this one: do not leak the file handle.
+                    runCatching { s?.close() }
+                    throw e
+                }
+                s to siblingChapters(target)
             }
             progress.visibility = View.GONE
             chapters = siblings
@@ -287,7 +421,7 @@ class ViewerActivity : AppCompatActivity() {
             else -> 0
         }
         currentIndex = start.coerceIn(0, src.pageCount - 1)
-        if (mode != MODE_PAGED && prefs.fit == "screen") prefs.fit = "width"
+        seenPages.clear()
         attach()
     }
 
@@ -309,7 +443,9 @@ class ViewerActivity : AppCompatActivity() {
             doubleTapZoom = prefs.doubleTapZoom,
             twoPage = useSpread(),
             rtl = readingDir == "rtl",
-            onVerticalDrag = if (brightnessGestureEnabled()) ({ dy -> onBrightnessDrag(dy) }) else null
+            onVerticalDrag = if (brightnessGestureEnabled()) ({ dy -> onBrightnessDrag(dy) }) else null,
+            autoCrop = autoCrop,
+            preload = prefs.preload
         )
         a.fitMode = effectiveFit()
         a.filter = filter
@@ -355,7 +491,7 @@ class ViewerActivity : AppCompatActivity() {
     private fun effectiveFit(): ZoomImageView.FitMode {
         // "Fit screen" is meaningless for a continuous column, so treat it as
         // fit-to-width there.
-        val name = if (mode != MODE_PAGED && prefs.fit == "screen") "width" else prefs.fit
+        val name = if (mode != MODE_PAGED && fit == "screen") "width" else fit
         return when (name) {
             "width" -> ZoomImageView.FitMode.WIDTH
             "height" -> ZoomImageView.FitMode.HEIGHT
@@ -418,7 +554,9 @@ class ViewerActivity : AppCompatActivity() {
         chapterText.text = modeLabel()
         updateChapterButtons()
         updateEndCard()
-        if (count > 0 && currentIndex >= count - 1) {
+        if (currentIndex in 0 until count) seenPages.set(currentIndex)
+        if (!markedRead && count > 0 && currentIndex >= count - 1) {
+            markedRead = true
             file?.absolutePath?.let { library.setRead(it, true) }
         }
         invalidateOptionsMenu()
@@ -436,7 +574,12 @@ class ViewerActivity : AppCompatActivity() {
             MODE_LONGSTRIP -> !vertical.canScrollVertically(1)
             else -> currentIndex >= src.pageCount - 1
         }
-        if (atEnd) showEndCard() else hideEndCard()
+        if (!atEnd) {
+            endDismissed = false
+            hideEndCard()
+        } else if (!endDismissed) {
+            showEndCard()
+        }
     }
 
     private fun showEndCard() {
@@ -595,18 +738,25 @@ class ViewerActivity : AppCompatActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (prefs.volumeKeys) {
-            when (keyCode) {
-                KeyEvent.KEYCODE_VOLUME_UP -> {
-                    goTo(currentIndex + 1); return true
-                }
-                KeyEvent.KEYCODE_VOLUME_DOWN -> {
-                    goTo(currentIndex - 1); return true
-                }
+        if (prefs.volumeKeys && isVolumeKey(keyCode)) {
+            // Auto-repeat would skip pages while the key is held; one press, one page.
+            if (event.repeatCount == 0) {
+                stopAutoScroll()
+                goTo(currentIndex + if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) 1 else -1)
             }
+            return true
         }
         return super.onKeyDown(keyCode, event)
     }
+
+    /** Swallow the key-up too, otherwise the system still shows its volume UI. */
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (prefs.volumeKeys && isVolumeKey(keyCode)) return true
+        return super.onKeyUp(keyCode, event)
+    }
+
+    private fun isVolumeKey(keyCode: Int) =
+        keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
 
     // ------------------------------------------------------------------ menu
 
@@ -627,24 +777,62 @@ class ViewerActivity : AppCompatActivity() {
             isChecked = twoPage
             isEnabled = mode == MODE_PAGED
         }
-        menu.findItem(R.id.menu_dir_ltr)?.isChecked = readingDir == "ltr"
-        menu.findItem(R.id.menu_dir_rtl)?.isChecked = readingDir == "rtl"
-        menu.findItem(R.id.menu_mode_paged)?.isChecked = mode == MODE_PAGED
-        menu.findItem(R.id.menu_mode_vertical)?.isChecked = mode == MODE_VERTICAL
-        menu.findItem(R.id.menu_mode_longstrip)?.isChecked = mode == MODE_LONGSTRIP
-        val fit = effectiveFit()
-        menu.findItem(R.id.menu_fit_screen)?.isChecked = fit == ZoomImageView.FitMode.SCREEN
-        menu.findItem(R.id.menu_fit_width)?.isChecked = fit == ZoomImageView.FitMode.WIDTH
-        menu.findItem(R.id.menu_fit_height)?.isChecked = fit == ZoomImageView.FitMode.HEIGHT
-        menu.findItem(R.id.menu_fit_stretch)?.isChecked = fit == ZoomImageView.FitMode.STRETCH
-        menu.findItem(R.id.menu_filter_none)?.isChecked = filter == Filters.NONE
-        menu.findItem(R.id.menu_filter_invert)?.isChecked = filter == Filters.INVERT
-        menu.findItem(R.id.menu_filter_grayscale)?.isChecked = filter == Filters.GRAYSCALE
-        menu.findItem(R.id.menu_filter_contrast)?.isChecked = filter == Filters.CONTRAST
-        menu.findItem(R.id.menu_filter_sepia)?.isChecked = filter == Filters.SEPIA
+        // Items in a single-choice group must only ever be set to checked: calling
+        // setChecked(false) on one of them re-checks it, which left the last item of
+        // every group showing as selected no matter what was active.
+        checkOnly(menu, if (readingDir == "rtl") R.id.menu_dir_rtl else R.id.menu_dir_ltr)
+        checkOnly(
+            menu,
+            when (mode) {
+                MODE_VERTICAL -> R.id.menu_mode_vertical
+                MODE_LONGSTRIP -> R.id.menu_mode_longstrip
+                else -> R.id.menu_mode_paged
+            }
+        )
+        checkOnly(
+            menu,
+            when (effectiveFit()) {
+                ZoomImageView.FitMode.WIDTH -> R.id.menu_fit_width
+                ZoomImageView.FitMode.HEIGHT -> R.id.menu_fit_height
+                ZoomImageView.FitMode.STRETCH -> R.id.menu_fit_stretch
+                else -> R.id.menu_fit_screen
+            }
+        )
+        checkOnly(
+            menu,
+            when (filter) {
+                Filters.INVERT -> R.id.menu_filter_invert
+                Filters.GRAYSCALE -> R.id.menu_filter_grayscale
+                Filters.CONTRAST -> R.id.menu_filter_contrast
+                Filters.SEPIA -> R.id.menu_filter_sepia
+                else -> R.id.menu_filter_none
+            }
+        )
+        checkOnly(
+            menu,
+            when (requestedOrientation) {
+                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT -> R.id.menu_orient_portrait
+                ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE -> R.id.menu_orient_landscape
+                else -> R.id.menu_orient_default
+            }
+        )
+        menu.findItem(R.id.menu_auto_scroll)?.isChecked = autoScrolling
+        menu.findItem(R.id.menu_auto_crop)?.apply {
+            isChecked = autoCrop
+            isEnabled = mode != MODE_LONGSTRIP
+        }
+        menu.findItem(R.id.menu_series)?.apply {
+            isVisible = prefs.perSeries
+            isChecked = seriesActive
+        }
+        menu.findItem(R.id.menu_chapters)?.isEnabled = chapters.size > 1
         menu.findItem(R.id.menu_prev_chapter)?.isEnabled = prevChapter() != null
         menu.findItem(R.id.menu_next_chapter)?.isEnabled = nextChapter() != null
         return super.onPrepareOptionsMenu(menu)
+    }
+
+    private fun checkOnly(menu: Menu, id: Int) {
+        menu.findItem(id)?.isChecked = true
     }
 
     /**
@@ -668,15 +856,9 @@ class ViewerActivity : AppCompatActivity() {
             R.id.menu_mode_longstrip to { setPageMode(MODE_LONGSTRIP) },
             R.id.menu_dir_ltr to { setReadingDir("ltr") },
             R.id.menu_dir_rtl to { setReadingDir("rtl") },
-            R.id.menu_orient_default to {
-                requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-            },
-            R.id.menu_orient_portrait to {
-                requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-            },
-            R.id.menu_orient_landscape to {
-                requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-            }
+            R.id.menu_orient_default to { setOrientationLock(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) },
+            R.id.menu_orient_portrait to { setOrientationLock(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT) },
+            R.id.menu_orient_landscape to { setOrientationLock(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE) }
         )
     }
 
@@ -689,6 +871,13 @@ class ViewerActivity : AppCompatActivity() {
         }
         return when (id) {
             R.id.menu_tune -> { showReaderSheet(); true }
+            R.id.menu_chapters -> { showChapterList(); true }
+            R.id.menu_auto_scroll -> { toggleAutoScroll(); true }
+            R.id.menu_auto_speed -> { showAutoSpeedDialog(); true }
+            R.id.menu_auto_crop -> { toggleAutoCrop(); true }
+            R.id.menu_series -> { toggleSeries(); true }
+            R.id.menu_share_page -> { exportPage(share = true); true }
+            R.id.menu_save_page -> { exportPage(share = false); true }
             R.id.menu_jump -> { showJumpDialog(); true }
             R.id.menu_rotate -> { cycleOrientation(); true }
             R.id.menu_bookmark -> { toggleBookmark(); true }
@@ -710,7 +899,8 @@ class ViewerActivity : AppCompatActivity() {
     // ------------------------------------------------------------------ reader options
 
     private fun setFit(name: String) {
-        prefs.fit = name
+        fit = name
+        persistLayout()
         adapter?.fitMode = effectiveFit()
         invalidateOptionsMenu()
     }
@@ -723,16 +913,17 @@ class ViewerActivity : AppCompatActivity() {
     }
 
     private fun setReadingDir(dir: String) {
+        if (readingDir == dir) return
         readingDir = dir
-        prefs.readingDir = dir
+        persistLayout()
         attach()
     }
 
     private fun setPageMode(newMode: String) {
         if (newMode == mode) return
+        stopAutoScroll()
         mode = newMode
-        prefs.pageMode = newMode
-        if (mode != MODE_PAGED && prefs.fit == "screen") prefs.fit = "width"
+        persistLayout()
         attach()
     }
 
@@ -748,17 +939,22 @@ class ViewerActivity : AppCompatActivity() {
             return
         }
         twoPage = !twoPage
-        prefs.twoPage = twoPage
+        persistLayout()
         attach()
+    }
+
+    private fun setOrientationLock(value: Int) {
+        requestedOrientation = value
+        invalidateOptionsMenu()
     }
 
     private fun cycleOrientation() {
         val landscape = resources.configuration.orientation ==
             android.content.res.Configuration.ORIENTATION_LANDSCAPE
-        requestedOrientation = if (landscape)
-            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-        else
-            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        setOrientationLock(
+            if (landscape) ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            else ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        )
     }
 
     private fun showReaderSheet() {
@@ -828,6 +1024,7 @@ class ViewerActivity : AppCompatActivity() {
                 Filters.INVERT -> R.id.chip_filter_invert
                 Filters.GRAYSCALE -> R.id.chip_filter_grayscale
                 Filters.CONTRAST -> R.id.chip_filter_contrast
+                Filters.SEPIA -> R.id.chip_filter_sepia
                 else -> R.id.chip_filter_none
             }
         )
@@ -836,6 +1033,7 @@ class ViewerActivity : AppCompatActivity() {
                 R.id.chip_filter_invert -> setFilter(Filters.INVERT)
                 R.id.chip_filter_grayscale -> setFilter(Filters.GRAYSCALE)
                 R.id.chip_filter_contrast -> setFilter(Filters.CONTRAST)
+                R.id.chip_filter_sepia -> setFilter(Filters.SEPIA)
                 R.id.chip_filter_none -> setFilter(Filters.NONE)
             }
         }
@@ -914,19 +1112,9 @@ class ViewerActivity : AppCompatActivity() {
             value = (brightness / 5 * 5).toFloat().coerceIn(20f, 100f)
         }
         slider.addOnChangeListener { _, value, _ -> setBrightness(value.toInt()) }
-        val container = LinearLayout(this).apply {
-            setPadding(48, 24, 48, 0)
-            addView(
-                slider,
-                LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                )
-            )
-        }
         AlertDialog.Builder(this)
             .setTitle(R.string.menu_brightness)
-            .setView(container)
+            .setView(sliderContainer(slider))
             .setPositiveButton(R.string.ok, null)
             .show()
     }
@@ -939,21 +1127,204 @@ class ViewerActivity : AppCompatActivity() {
             value = (spacingDp / 4 * 4).toFloat().coerceIn(0f, 48f)
         }
         slider.addOnChangeListener { _, value, _ -> setSpacingDp(value.toInt()) }
-        val container = LinearLayout(this).apply {
-            setPadding(48, 24, 48, 0)
-            addView(
-                slider,
-                LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                )
-            )
-        }
         AlertDialog.Builder(this)
             .setTitle(R.string.menu_page_spacing)
-            .setView(container)
+            .setView(sliderContainer(slider))
             .setPositiveButton(R.string.ok, null)
             .show()
+    }
+
+    // ------------------------------------------------------------------ auto-scroll
+
+    private fun toggleAutoScroll() {
+        if (autoScrolling) stopAutoScroll() else startAutoScroll()
+    }
+
+    private fun startAutoScroll() {
+        if (source == null || autoScrolling) return
+        autoScrolling = true
+        autoRemainder = 0f
+        autoLastFrame = SystemClock.uptimeMillis()
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        if (barsVisible) toggleBars()
+        handler.post(autoTick)
+        invalidateOptionsMenu()
+    }
+
+    private fun stopAutoScroll() {
+        if (!autoScrolling) return
+        autoScrolling = false
+        handler.removeCallbacks(autoTick)
+        applyKeepScreenOn()
+        invalidateOptionsMenu()
+    }
+
+    private val autoTick = object : Runnable {
+        override fun run() {
+            if (!autoScrolling) return
+            if (mode == MODE_PAGED) {
+                val count = source?.pageCount ?: return
+                val step = if (useSpread()) 2 else 1
+                if (currentIndex + step >= count) {
+                    stopAutoScroll()
+                    return
+                }
+                goTo(currentIndex + step)
+                handler.postDelayed(this, PAGE_INTERVAL_MS_BASE / prefs.autoSpeed)
+            } else {
+                val now = SystemClock.uptimeMillis()
+                val dt = (now - autoLastFrame).coerceAtMost(100L)
+                autoLastFrame = now
+                autoRemainder += prefs.autoSpeed * DP_PER_SECOND_PER_STEP *
+                    resources.displayMetrics.density * dt / 1000f
+                val px = autoRemainder.toInt()
+                autoRemainder -= px
+                if (px > 0) vertical.scrollBy(0, px)
+                if (!vertical.canScrollVertically(1)) {
+                    stopAutoScroll()
+                    return
+                }
+                handler.postDelayed(this, FRAME_MS)
+            }
+        }
+    }
+
+    private fun showAutoSpeedDialog() {
+        val slider = Slider(this).apply {
+            valueFrom = 1f
+            valueTo = 10f
+            stepSize = 1f
+            value = prefs.autoSpeed.toFloat()
+        }
+        val builder = AlertDialog.Builder(this)
+            .setTitle(getString(R.string.auto_speed_value, prefs.autoSpeed))
+            .setPositiveButton(R.string.ok, null)
+        val dialog = builder.create()
+        slider.addOnChangeListener { _, value, fromUser ->
+            if (!fromUser) return@addOnChangeListener
+            prefs.autoSpeed = value.toInt()
+            dialog.setTitle(getString(R.string.auto_speed_value, prefs.autoSpeed))
+        }
+        dialog.setView(sliderContainer(slider))
+        dialog.show()
+    }
+
+    private fun sliderContainer(slider: Slider): LinearLayout = LinearLayout(this).apply {
+        setPadding(48, 24, 48, 0)
+        addView(
+            slider,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
+    }
+
+    private fun toggleAutoCrop() {
+        autoCrop = !autoCrop
+        prefs.autoCrop = autoCrop
+        attach()
+    }
+
+    // ------------------------------------------------------------------ chapter list
+
+    private fun showChapterList() {
+        val list = chapters
+        if (list.size < 2) return
+        val read = library.readSet()
+        val current = siblingIndex()
+        val labels = list.mapIndexed { i, f ->
+            val mark = when {
+                i == current -> "▶ "
+                f.absolutePath in read -> "✓ "
+                else -> "     "
+            }
+            mark + chapterLabel(f)
+        }.toTypedArray()
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(R.string.chapters_title)
+            .setItems(labels) { _, which -> if (which != current) openChapter(list[which], 0) }
+            .setNegativeButton(R.string.close, null)
+            .create()
+        dialog.show()
+        if (current > 2) dialog.listView.setSelection(current - 2)
+    }
+
+    // ------------------------------------------------------------------ share / save page
+
+    private fun fileSafeName(): String {
+        val base = file?.let { chapterLabel(it) } ?: "page"
+        return base.replace(Regex("[^A-Za-z0-9._-]"), "_").take(60) + "_p" + (currentIndex + 1)
+    }
+
+    /** Renders the current page at full resolution and either shares or saves it. */
+    private fun exportPage(share: Boolean) {
+        val src = source ?: return
+        val page = currentIndex
+        val name = fileSafeName()
+        progress.visibility = View.VISIBLE
+        lifecycleScope.launch {
+            val outcome = withContext(AppDispatchers.io) {
+                runCatching {
+                    val bitmap = src.loadPage(page, EXPORT_W, EXPORT_H)
+                    if (share) shareUri(bitmap, name) else {
+                        savePicture(bitmap, name)
+                        null
+                    }
+                }
+            }
+            progress.visibility = View.GONE
+            val uri = outcome.getOrNull()
+            when {
+                outcome.isFailure -> toast(R.string.error_load)
+                share && uri != null -> startActivity(
+                    Intent.createChooser(
+                        Intent(Intent.ACTION_SEND)
+                            .setType("image/png")
+                            .putExtra(Intent.EXTRA_STREAM, uri)
+                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
+                        getString(R.string.menu_share_page)
+                    )
+                )
+                else -> toast(R.string.page_saved)
+            }
+        }
+    }
+
+    /** Writes [bitmap] under cache/shared (exposed through the FileProvider) and returns its URI. */
+    private fun shareUri(bitmap: Bitmap, name: String): android.net.Uri {
+        val dir = File(cacheDir, SHARE_DIR)
+        dir.mkdirs()
+        dir.listFiles()?.forEach { runCatching { it.delete() } } // keep only the latest shared page
+        val out = File(dir, "$name.png")
+        out.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        return FileProvider.getUriForFile(this, "$packageName.files", out)
+    }
+
+    private fun savePicture(bitmap: Bitmap, name: String) {
+        val stamp = System.currentTimeMillis()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val values = ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, "${name}_$stamp.png")
+                put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+                put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/ComicReader")
+                put(MediaStore.Images.Media.IS_PENDING, 1)
+            }
+            val resolver = contentResolver
+            val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                ?: throw java.io.IOException("Could not create the picture")
+            try {
+                resolver.openOutputStream(uri)!!.use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                resolver.update(uri, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null)
+            } catch (t: Throwable) {
+                resolver.delete(uri, null, null)
+                throw t
+            }
+        } else {
+            val dir = getExternalFilesDir(Environment.DIRECTORY_PICTURES) ?: File(cacheDir, "pictures")
+            dir.mkdirs()
+            File(dir, "${name}_$stamp.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        }
     }
 
     // ------------------------------------------------------------------ bookmarks
@@ -1050,6 +1421,7 @@ class ViewerActivity : AppCompatActivity() {
                 toast(R.string.error_load)
                 return@launch
             }
+            cropSource = outFile
             cropLauncher.launch(
                 Intent(this@ViewerActivity, CropActivity::class.java)
                     .putExtra(CropActivity.EXTRA_PATH, outFile.absolutePath)
@@ -1064,6 +1436,14 @@ class ViewerActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_PATH = "extra_path"
         const val EXTRA_PAGE = "extra_page"
+
+        private const val SHARE_DIR = "shared"
+        private const val EXPORT_W = 2400
+        private const val EXPORT_H = 3200
+        private const val MAX_SESSION_SECONDS = 4L * 3600
+        private const val PAGE_INTERVAL_MS_BASE = 13_000L
+        private const val DP_PER_SECOND_PER_STEP = 30f
+        private const val FRAME_MS = 16L
 
         private const val MODE_PAGED = "paged"
         private const val MODE_VERTICAL = "vertical"

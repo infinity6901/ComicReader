@@ -25,6 +25,22 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_chapters"
+        android:title="@string/menu_chapters"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_auto_scroll"
+        android:checkable="true"
+        android:title="@string/menu_auto_scroll"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_auto_speed"
+        android:title="@string/menu_auto_speed"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_fit"
         android:title="@string/menu_fit"
         app:showAsAction="never">
@@ -88,6 +104,12 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_auto_crop"
+        android:checkable="true"
+        android:title="@string/menu_auto_crop"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_filters"
         android:title="@string/menu_filters"
         app:showAsAction="never">
@@ -143,6 +165,16 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_share_page"
+        android:title="@string/menu_share_page"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_save_page"
+        android:title="@string/menu_save_page"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_rotate"
         android:title="@string/menu_rotate"
         app:showAsAction="never" />
@@ -165,6 +197,12 @@
             </group>
         </menu>
     </item>
+
+    <item
+        android:id="@+id/menu_series"
+        android:checkable="true"
+        android:title="@string/menu_remember_series"
+        app:showAsAction="never" />
 
     <item
         android:id="@+id/menu_keep_on"

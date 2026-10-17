@@ -44,6 +44,15 @@ Get the latest signed APK from the [**Releases**](https://github.com/infinity690
   location, rename, mark read/unread or delete it.
 - Breadcrumb path bar, quick favorite button, back button navigates up (clamped
   at the root of internal storage).
+- Folder rows show "N items · M read"; a folder whose items are all read gets the
+  read badge. **Continue reading** jumps to the next unfinished book in a folder,
+  and a whole folder can be marked read or unread.
+- **Search subfolders** (menu) looks below the current folder, not just in it.
+- Opening a book resumes at the last page unless it was already finished.
+- Files opened from other apps (`content://`) are copied to the cache and opened.
+- Housekeeping: **duplicate file finder** (content-checked), **largest files** list,
+  reading **statistics**, and **backup / restore** of your library and settings
+  (Settings → Your data) to a JSON file you choose.
 
 ### Reader
 - **Formats:** images (`jpg`, `jpeg`, `png`, `gif`, `bmp`, `webp`, `avif`) and
@@ -57,6 +66,13 @@ Get the latest signed APK from the [**Releases**](https://github.com/infinity690
 - **Zoom / pan:** pinch-to-zoom, drag to pan, double-tap to zoom or reset.
 - **Fit modes:** fit screen, fit width, fit height, stretch.
 - **Page filter:** none, invert, grayscale, high contrast, sepia.
+- **Auto-scroll** with adjustable speed (continuous in vertical / long-strip modes,
+  timed page turns in paged mode); touching the screen takes over.
+- **Auto-crop** trims blank page borders; pages ahead are **preloaded**.
+- **Chapter list** to jump to any chapter in the folder.
+- **Share** or **save** the current page as an image.
+- **Per-folder layout:** "Remember layout for this folder" stores mode, direction, fit
+  and spread for that folder only.
 - **Brightness** overlay (with an optional vertical-drag gesture) and a **night**
   filter.
 - **Page spacing** slider for vertical and long-strip modes.
@@ -143,8 +159,8 @@ the archive backends survive minification.
 
 | Artifact | Size | Notes |
 |---|---|---|
-| `ComicReader-1.0-foss-release.apk` | 2.57 MB | v2-signed, R8-minified, offline |
-| `ComicReader-1.0-debug.apk` | 8.44 MB | debuggable, unsigned-config |
+| `ComicReader-1.1-foss-release.apk` | 2.61 MB | v2-signed, R8-minified, offline |
+| `ComicReader-1.1-debug.apk` | 7.52 MB | debuggable, unsigned-config |
 
 ### Install on a connected device
 

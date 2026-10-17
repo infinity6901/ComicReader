@@ -1,4 +1,4 @@
-﻿package com.infinity.comicreader.ui
+package com.infinity.comicreader.ui
 
 import android.content.Context
 import android.graphics.Matrix
@@ -8,6 +8,7 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import androidx.appcompat.widget.AppCompatImageView
+import kotlin.math.abs
 
 /**
  * Image view with pinch-to-zoom, panning, double-tap zoom and configurable fit modes.
@@ -33,6 +34,7 @@ class ZoomImageView @JvmOverloads constructor(
     private var maxScale = 8f
     private var lastX = 0f
     private var lastY = 0f
+    private val values = FloatArray(9)
 
     var onTap: ((Float) -> Unit)? = null
     var onVerticalDrag: ((Float) -> Unit)? = null
@@ -97,8 +99,6 @@ class ZoomImageView @JvmOverloads constructor(
         fit(mode)
     }
 
-    fun currentFitMode(): FitMode = fitMode
-
     fun fit(mode: FitMode = fitMode) {
         val drawable = drawable ?: return
         val viewW = width.toFloat()
@@ -126,10 +126,13 @@ class ZoomImageView @JvmOverloads constructor(
         }
         baseMatrix.reset()
         baseMatrix.postScale(scale, scale)
-        baseMatrix.postTranslate(
-            (viewW - drawableW * scale) / 2f,
-            (viewH - drawableH * scale) / 2f
-        )
+        val scaledW = drawableW * scale
+        val scaledH = drawableH * scale
+        // Centre what fits; when a page is taller (or wider) than the view start at its
+        // top (left) edge so reading begins at the beginning and the rest can be panned to.
+        val startX = if (scaledW > viewW) 0f else (viewW - scaledW) / 2f
+        val startY = if (scaledH > viewH) 0f else (viewH - scaledH) / 2f
+        baseMatrix.postTranslate(startX, startY)
         matrix.set(baseMatrix)
         currentScale = scale
         minScale = scale
@@ -147,7 +150,6 @@ class ZoomImageView @JvmOverloads constructor(
     }
 
     private fun clamp() {
-        val values = FloatArray(9)
         matrix.getValues(values)
         val transX = values[Matrix.MTRANS_X]
         val transY = values[Matrix.MTRANS_Y]
@@ -182,36 +184,77 @@ class ZoomImageView @JvmOverloads constructor(
         return true
     }
 
+    /** How far the content may still move in the drag direction (dx, dy), per axis. */
+    private fun roomX(dx: Float): Boolean {
+        val d = drawable ?: return false
+        matrix.getValues(values)
+        val contentW = d.intrinsicWidth * values[Matrix.MSCALE_X]
+        if (contentW <= width + EDGE_SLOP) return false
+        val tx = values[Matrix.MTRANS_X]
+        return if (dx > 0) tx < -EDGE_SLOP else tx > width - contentW + EDGE_SLOP
+    }
+
+    private fun roomY(dy: Float): Boolean {
+        val d = drawable ?: return false
+        matrix.getValues(values)
+        val contentH = d.intrinsicHeight * values[Matrix.MSCALE_Y]
+        if (contentH <= height + EDGE_SLOP) return false
+        val ty = values[Matrix.MTRANS_Y]
+        return if (dy > 0) ty < -EDGE_SLOP else ty > height - contentH + EDGE_SLOP
+    }
+
+    /** True when the content is larger than the view in either direction. */
+    private fun canPan(): Boolean {
+        val d = drawable ?: return false
+        matrix.getValues(values)
+        return d.intrinsicWidth * values[Matrix.MSCALE_X] > width + EDGE_SLOP ||
+            d.intrinsicHeight * values[Matrix.MSCALE_Y] > height + EDGE_SLOP
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         scaleDetector.onTouchEvent(event)
         gestureDetector.onTouchEvent(event)
 
-        val zoomed = currentScale > minScale * 1.01f
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 lastX = event.x
                 lastY = event.y
-                parent?.requestDisallowInterceptTouchEvent(zoomed)
+                // Until we know the drag direction, let a pannable page keep the gesture.
+                parent?.requestDisallowInterceptTouchEvent(canPan())
             }
-            MotionEvent.ACTION_MOVE -> {
-                if (!scaleDetector.isInProgress && event.pointerCount == 1) {
-                    if (zoomed) {
-                        val dx = event.x - lastX
-                        val dy = event.y - lastY
-                        matrix.postTranslate(dx, dy)
-                        clamp()
-                        imageMatrix = matrix
-                        parent?.requestDisallowInterceptTouchEvent(true)
-                    } else {
-                        onVerticalDrag?.invoke(event.y - lastY)
-                    }
-                }
-                lastX = event.x
-                lastY = event.y
-            }
+            MotionEvent.ACTION_MOVE -> handleMove(event)
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL ->
                 parent?.requestDisallowInterceptTouchEvent(false)
         }
         return true
+    }
+
+    private fun handleMove(event: MotionEvent) {
+        if (scaleDetector.isInProgress) {
+            parent?.requestDisallowInterceptTouchEvent(true)
+        } else if (event.pointerCount == 1) {
+            val dx = event.x - lastX
+            val dy = event.y - lastY
+            if (canPan()) {
+                // Pan while there is room in the dominant direction; at an edge hand the
+                // gesture back so the pager / list can move to the next page.
+                val horizontal = abs(dx) >= abs(dy)
+                val room = if (horizontal) roomX(dx) else roomY(dy)
+                parent?.requestDisallowInterceptTouchEvent(room)
+                if (room) {
+                    matrix.postTranslate(if (roomX(dx)) dx else 0f, if (roomY(dy)) dy else 0f)
+                    clamp()
+                    imageMatrix = matrix
+                }
+            } else {
+                onVerticalDrag?.invoke(dy)
+            }
+        }
+        lastX = event.x
+        lastY = event.y
+    }
+
+    private companion object {
+        const val EDGE_SLOP = 2f
     }
 }

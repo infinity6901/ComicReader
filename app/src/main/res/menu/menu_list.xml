@@ -39,6 +39,35 @@
         android:title="@string/menu_add_favorite"
         app:showAsAction="never" />
     <item
+        android:id="@+id/menu_continue"
+        android:title="@string/menu_continue"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_mark_all_read"
+        android:title="@string/menu_mark_all_read"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_mark_all_unread"
+        android:title="@string/menu_mark_all_unread"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_search_deep"
+        android:checkable="true"
+        android:title="@string/menu_search_deep"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_dupes"
+        android:title="@string/menu_dupes"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_large"
+        android:title="@string/menu_large"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_stats"
+        android:title="@string/menu_stats"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/menu_refresh"
         android:title="@string/menu_refresh"
         app:showAsAction="never" />

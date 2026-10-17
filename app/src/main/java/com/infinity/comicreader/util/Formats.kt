@@ -1,4 +1,4 @@
-﻿package com.infinity.comicreader.util
+package com.infinity.comicreader.util
 
 import com.infinity.comicreader.data.EntryType
 

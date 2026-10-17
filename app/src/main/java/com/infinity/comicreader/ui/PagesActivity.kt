@@ -1,4 +1,4 @@
-﻿package com.infinity.comicreader.ui
+package com.infinity.comicreader.ui
 
 import android.content.Intent
 import android.os.Bundle
@@ -11,9 +11,12 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.infinity.comicreader.R
 import com.infinity.comicreader.data.Prefs
+import com.infinity.comicreader.reader.PageSource
 import com.infinity.comicreader.reader.PageSources
 import com.infinity.comicreader.util.AppDispatchers
 import com.google.android.material.appbar.MaterialToolbar
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -22,6 +25,7 @@ import java.io.File
 class PagesActivity : AppCompatActivity() {
 
     private var adapter: ThumbAdapter? = null
+    private var source: PageSource? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,14 +51,23 @@ class PagesActivity : AppCompatActivity() {
         val prefs = Prefs(this)
         lifecycleScope.launch {
             val result = withContext(AppDispatchers.io) {
-                runCatching { PageSources.open(File(path), prefs.charset) }
+                val opened = runCatching { PageSources.open(File(path), prefs.charset) }
+                try {
+                    ensureActive()
+                } catch (e: CancellationException) {
+                    // Closed while loading: do not leak the archive handle.
+                    opened.getOrNull()?.let { runCatching { it.close() } }
+                    throw e
+                }
+                opened
             }
             progress.visibility = View.GONE
-            result.onSuccess { source ->
+            result.onSuccess { opened ->
+                source = opened
                 val f = File(path)
                 val dot = f.name.lastIndexOf('.')
                 toolbar.subtitle = if (dot > 0) f.name.substring(0, dot) else f.name
-                val a = ThumbAdapter(source, current) { page ->
+                val a = ThumbAdapter(opened, current) { page ->
                     setResult(RESULT_OK, Intent().putExtra(EXTRA_RESULT_PAGE, page))
                     finish()
                 }
@@ -71,6 +84,8 @@ class PagesActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         adapter?.release()
+        runCatching { source?.close() }
+        source = null
     }
 
     companion object {

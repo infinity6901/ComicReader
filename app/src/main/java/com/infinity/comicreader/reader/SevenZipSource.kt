@@ -1,4 +1,4 @@
-﻿package com.infinity.comicreader.reader
+package com.infinity.comicreader.reader
 
 import android.graphics.Bitmap
 import android.util.Log
@@ -13,18 +13,22 @@ import java.io.IOException
 class SevenZipSource(file: File) : PageSource {
     private val sz: SevenZFile = SevenZFile.builder().setFile(file).get()
 
-    private val entries: List<SevenZArchiveEntry>
+    private val entries: List<SevenZArchiveEntry> = readEntries()
 
-    override val title: String = file.name
 
-    init {
-        val list = ArrayList<SevenZArchiveEntry>()
-        var e = sz.nextEntry
-        while (e != null) {
-            if (!e.isDirectory && Formats.isImageName(e.name)) list.add(e)
-            e = sz.nextEntry
+    private fun readEntries(): List<SevenZArchiveEntry> {
+        try {
+            val list = ArrayList<SevenZArchiveEntry>()
+            var e = sz.nextEntry
+            while (e != null) {
+                if (!e.isDirectory && Formats.isImageName(e.name)) list.add(e)
+                e = sz.nextEntry
+            }
+            return list.sortedWith { a, b -> NaturalOrder.compare(a.name, b.name) }
+        } catch (t: Throwable) {
+            runCatching { sz.close() }
+            throw t
         }
-        entries = list.sortedWith { a, b -> NaturalOrder.compare(a.name, b.name) }
     }
 
     override val pageCount: Int get() = entries.size

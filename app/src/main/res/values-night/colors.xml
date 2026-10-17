@@ -43,8 +43,6 @@
     <color name="md_inverse_on_surface">#2F3038</color>
     <color name="md_inverse_primary">#4F46E5</color>
 
-    <color name="md_scrim">#000000</color>
 
-    <color name="thumbnail_placeholder">#292A30</color>
 
 </resources>

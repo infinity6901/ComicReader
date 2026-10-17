@@ -1,4 +1,4 @@
-﻿package com.infinity.comicreader.ui
+package com.infinity.comicreader.ui
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -9,14 +9,21 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import androidx.recyclerview.widget.RecyclerView
+import com.infinity.comicreader.reader.BitmapUtils
 import com.infinity.comicreader.reader.Filters
 import com.infinity.comicreader.reader.PageSource
 import com.infinity.comicreader.util.AppDispatchers
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Renders [PageSource] pages into zoomable images.
@@ -28,8 +35,14 @@ import kotlinx.coroutines.withContext
  *  - [Mode.LONG_STRIP] continuous vertical strip sized from each page's aspect
  *                     ratio with no gaps, as used by webtoons/manhwa.
  *
+ * Decoding happens off the main thread, at most [DECODE_THREADS] pages at a time.
+ * Results live in a byte-budgeted cache, a page that is requested twice shares one
+ * decode, a decode nobody is waiting for any more is dropped before it starts, and
+ * the next [preload] pages are decoded ahead of time. With [autoCrop] blank borders
+ * are trimmed (never in long-strip mode, where the gaps belong to the art).
+ *
  * A [RecyclerView.Adapter] has a fixed item view type, so callers build a fresh
- * instance whenever the mode, spread or reading direction changes.
+ * instance whenever the mode, spread, reading direction or [autoCrop] changes.
  */
 class PageAdapter(
     private val source: PageSource,
@@ -38,7 +51,9 @@ class PageAdapter(
     private val doubleTapZoom: Boolean,
     private val twoPage: Boolean = false,
     private val rtl: Boolean = false,
-    private val onVerticalDrag: ((Float) -> Unit)? = null
+    private val onVerticalDrag: ((Float) -> Unit)? = null,
+    private val autoCrop: Boolean = false,
+    private val preload: Int = 2
 ) : RecyclerView.Adapter<PageAdapter.PageHolder>() {
 
     enum class Mode { PAGED, VERTICAL, LONG_STRIP }
@@ -54,7 +69,10 @@ class PageAdapter(
 
     var fitMode: ZoomImageView.FitMode = ZoomImageView.FitMode.SCREEN
         set(value) {
+            if (field == value) return
             field = value
+            // Paged pages are decoded for the active fit mode, so they must be redone.
+            if (mode == Mode.PAGED) dropDecoded()
             notifyItemRangeChanged(0, itemCount)
         }
 
@@ -64,18 +82,33 @@ class PageAdapter(
             notifyItemRangeChanged(0, itemCount)
         }
 
+    private class Pending(val deferred: Deferred<Bitmap?>) {
+        var waiters = 0
+        var prefetch = false
+    }
+
     private val scope = CoroutineScope(SupervisorJob() + AppDispatchers.main)
-    private val cache = object : LruCache<String, Bitmap>(6) {}
-    private val aspects = HashMap<Int, Float>()
+    private val gate = Semaphore(DECODE_THREADS)
+    private val cache = object : LruCache<Int, Bitmap>(cacheBytes()) {
+        override fun sizeOf(key: Int, value: Bitmap): Int = value.byteCount
+    }
+    private val pending = HashMap<Int, Pending>()
+    private val aspects = ConcurrentHashMap<Int, Float>()
     private var learnedAspect = 1.45f
     private var recyclerWidth = 0
     private var fallbackWidth = 1080
+    private var lastReqW = 1080
+    private var lastReqH = 1920
     private var layoutListener: View.OnLayoutChangeListener? = null
 
     private val spread = twoPage && mode == Mode.PAGED
 
     inner class PageHolder(val container: View, val images: List<ZoomImageView>) :
-        RecyclerView.ViewHolder(container)
+        RecyclerView.ViewHolder(container) {
+        /** The page each image is showing or waiting for, and the coroutine waiting for it. */
+        val pages = IntArray(images.size) { NO_PAGE }
+        val waiters = arrayOfNulls<Job>(images.size)
+    }
 
     override fun getItemCount(): Int = if (spread) (source.pageCount + 1) / 2 else source.pageCount
 
@@ -146,14 +179,28 @@ class PageAdapter(
         if (spread) {
             val firstPage = if (rtl) position * 2 + 1 else position * 2
             val secondPage = if (rtl) position * 2 else position * 2 + 1
-            bindImage(holder, holder.images[0], firstPage)
-            bindImage(holder, holder.images[1], secondPage)
+            bindImage(holder, 0, firstPage)
+            bindImage(holder, 1, secondPage)
+            prefetchAfter(position * 2 + 1)
         } else {
-            bindImage(holder, holder.images[0], position)
+            bindImage(holder, 0, position)
+            prefetchAfter(position)
         }
     }
 
-    private fun bindImage(holder: PageHolder, image: ZoomImageView, pageIndex: Int) {
+    override fun onViewRecycled(holder: PageHolder) {
+        super.onViewRecycled(holder)
+        for (i in holder.images.indices) {
+            stopWaiting(holder, i)
+            holder.images[i].setImageDrawable(null)
+        }
+    }
+
+    // ------------------------------------------------------------------ binding
+
+    private fun bindImage(holder: PageHolder, slot: Int, pageIndex: Int) {
+        val image = holder.images[slot]
+        stopWaiting(holder, slot)
         if (pageIndex < 0 || pageIndex >= source.pageCount) {
             image.setImageDrawable(null)
             return
@@ -161,14 +208,39 @@ class PageAdapter(
         image.colorFilter = Filters.colorFilter(filter)
         prepareContainer(holder, pageIndex)
 
-        val key = pageIndex.toString()
-        val cached = cache.get(key)
+        val cached = cache.get(pageIndex)
         if (cached != null) {
             applyBitmap(image, cached)
             return
         }
         image.setImageDrawable(null)
-        loadPage(holder, image, pageIndex, key)
+
+        val (reqW, reqH) = requestSize(image)
+        lastReqW = reqW
+        lastReqH = reqH
+        val entry = request(pageIndex, reqW, reqH)
+        entry.waiters++
+        holder.pages[slot] = pageIndex
+        holder.waiters[slot] = scope.launch {
+            val bitmap = entry.deferred.await() ?: return@launch
+            applyBitmap(image, bitmap)
+            updateLongStripAspect(holder, pageIndex, bitmap)
+        }
+    }
+
+    /** Forgets the page [slot] was waiting for; abandons its decode if nobody else wants it. */
+    private fun stopWaiting(holder: PageHolder, slot: Int) {
+        holder.waiters[slot]?.cancel()
+        holder.waiters[slot] = null
+        val page = holder.pages[slot]
+        holder.pages[slot] = NO_PAGE
+        if (page == NO_PAGE) return
+        val entry = pending[page] ?: return
+        entry.waiters--
+        if (entry.waiters <= 0 && !entry.prefetch && entry.deferred.isActive) {
+            entry.deferred.cancel()
+            pending.remove(page)
+        }
     }
 
     /** Applies the per-mode container geometry (long-strip height, or page spacing). */
@@ -186,33 +258,65 @@ class PageAdapter(
         image.setFitMode(fitMode)
     }
 
-    private fun loadPage(holder: PageHolder, image: ZoomImageView, pageIndex: Int, key: String) {
-        val (reqW, reqH) = requestSize(image)
-        val holderPosition = holder.bindingAdapterPosition
-        scope.launch {
-            val bitmap = withContext(AppDispatchers.io) { decode(pageIndex, reqW, reqH) }
-                ?: return@launch
+    // ------------------------------------------------------------------ decoding
 
-            cache.put(key, bitmap)
-            if (holder.bindingAdapterPosition != holderPosition) return@launch
-            applyBitmap(image, bitmap)
-            updateLongStripAspect(holder, pageIndex, bitmap)
-        }
-    }
+    private fun cacheBytes(): Int =
+        (Runtime.getRuntime().maxMemory() / 6L).toInt().coerceAtLeast(MIN_CACHE_BYTES)
 
     private fun decode(pageIndex: Int, reqW: Int, reqH: Int): Bitmap? = try {
-        source.loadPage(pageIndex, reqW, reqH)
+        val raw = source.loadPage(pageIndex, reqW, reqH)
+        if (autoCrop && mode != Mode.LONG_STRIP) BitmapUtils.autoCrop(raw) else raw
     } catch (t: Throwable) {
         Log.w(TAG, "Failed to load page $pageIndex", t)
         null
     }
 
+    /** Starts (or joins) the background decode of [pageIndex]. Main thread only. */
+    private fun request(pageIndex: Int, reqW: Int, reqH: Int): Pending {
+        pending[pageIndex]?.let { return it }
+        val deferred = scope.async(AppDispatchers.io) {
+            gate.withPermit {
+                val bitmap = decode(pageIndex, reqW, reqH)
+                if (bitmap != null && bitmap.width > 0) {
+                    cache.put(pageIndex, bitmap)
+                    aspects[pageIndex] = bitmap.height.toFloat() / bitmap.width.toFloat()
+                }
+                bitmap
+            }
+        }
+        val entry = Pending(deferred)
+        pending[pageIndex] = entry
+        deferred.invokeOnCompletion {
+            // Runs on the decoder thread; hop back before touching [pending].
+            scope.launch { if (pending[pageIndex] === entry) pending.remove(pageIndex) }
+        }
+        return entry
+    }
+
+    /** Decodes the [preload] pages after [lastShown] into the cache. */
+    private fun prefetchAfter(lastShown: Int) {
+        val ahead = if (mode == Mode.LONG_STRIP) minOf(preload, MAX_STRIP_PRELOAD) else preload
+        for (k in 1..ahead) {
+            val p = lastShown + k
+            if (p >= source.pageCount) break
+            if (cache.get(p) == null && pending[p] == null) request(p, lastReqW, lastReqH).prefetch = true
+        }
+    }
+
+    /** Throws away everything decoded so far (the requested size changed). */
+    private fun dropDecoded() {
+        // Cancelling can complete handlers inline, which edit [pending]: iterate a copy.
+        pending.values.toList().forEach { it.deferred.cancel() }
+        pending.clear()
+        cache.evictAll()
+    }
+
+    // ------------------------------------------------------------------ long strip
+
     /** Learns each page's real aspect ratio once its bitmap arrives, for long strips. */
     private fun updateLongStripAspect(holder: PageHolder, pageIndex: Int, bitmap: Bitmap) {
         if (mode != Mode.LONG_STRIP || bitmap.width <= 0) return
-        val real = bitmap.height.toFloat() / bitmap.width.toFloat()
-        aspects[pageIndex] = real
-        if (pageIndex == 0) learnedAspect = real
+        if (pageIndex == 0) learnedAspect = bitmap.height.toFloat() / bitmap.width.toFloat()
         applyHeight(holder.container, longStripHeight(pageIndex))
     }
 
@@ -250,23 +354,23 @@ class PageAdapter(
             }
             if (size != null && size[0] > 0) {
                 learnedAspect = size[1].toFloat() / size[0].toFloat()
-                aspects[0] = learnedAspect
+                aspects.putIfAbsent(0, learnedAspect)
                 notifyItemRangeChanged(0, itemCount)
             }
         }
     }
 
-    override fun onViewRecycled(holder: PageHolder) {
-        super.onViewRecycled(holder)
-        holder.images.forEach { it.setImageDrawable(null) }
-    }
-
     fun release() {
         scope.cancel()
+        pending.clear()
         cache.evictAll()
     }
 
     companion object {
         private const val TAG = "PageAdapter"
+        private const val NO_PAGE = -1
+        private const val DECODE_THREADS = 2
+        private const val MIN_CACHE_BYTES = 24 * 1024 * 1024
+        private const val MAX_STRIP_PRELOAD = 2
     }
 }
