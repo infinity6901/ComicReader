@@ -16,3 +16,6 @@ dist/
 *.apk
 *.aab
 .kotlin/
+
+# Build logs
+*.log
