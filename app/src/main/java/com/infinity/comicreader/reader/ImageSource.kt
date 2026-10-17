@@ -15,5 +15,7 @@ class ImageSource(private val file: File) : PageSource {
 
     override fun pageSize(index: Int): IntArray? = BitmapUtils.boundsFile(file.absolutePath)
 
-    override fun close() {}
+    override fun close() {
+        // Intentionally empty: pages are decoded on demand and no file handle is kept open.
+    }
 }

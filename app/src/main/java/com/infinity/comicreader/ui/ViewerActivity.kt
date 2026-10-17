@@ -151,8 +151,13 @@ class ViewerActivity : AppCompatActivity() {
                 if (fromUser) goTo(itemToPage(value))
             }
 
-            override fun onStartTrackingTouch(sb: SeekBar) {}
-            override fun onStopTrackingTouch(sb: SeekBar) {}
+            override fun onStartTrackingTouch(sb: SeekBar) {
+                // Intentionally empty: the page is updated in onProgressChanged only.
+            }
+
+            override fun onStopTrackingTouch(sb: SeekBar) {
+                // Intentionally empty: the page is updated in onProgressChanged only.
+            }
         })
 
         btnPrevChapter = findViewById(R.id.btn_prev_chapter)

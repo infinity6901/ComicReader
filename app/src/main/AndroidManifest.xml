@@ -10,15 +10,24 @@
         android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
 
+    <!--
+        allowBackup is off: the app is fully offline and its data (reading history,
+        bookmarks, preferences) is device-local, so there is nothing worth syncing to
+        cloud backup and nothing sensitive to leak through one.
+        usesCleartextTraffic is declared explicitly (false) because the reader makes no
+        network requests at all; without the explicit value Android implicitly enables
+        cleartext for apps targeting older platform versions.
+    -->
     <application
         android:name=".App"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:requestLegacyExternalStorage="true"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.ComicReader">
+        android:theme="@style/Theme.ComicReader"
+        android:usesCleartextTraffic="false">
 
         <activity
             android:name=".ui.ListActivity"

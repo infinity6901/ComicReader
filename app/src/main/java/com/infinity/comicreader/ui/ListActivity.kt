@@ -105,7 +105,11 @@ class ListActivity : AppCompatActivity() {
 
         tabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab) = onTabChanged(tab.position)
-            override fun onTabUnselected(tab: TabLayout.Tab) = Unit
+
+            override fun onTabUnselected(tab: TabLayout.Tab) {
+                // Intentionally empty: only the newly selected tab needs handling.
+            }
+
             override fun onTabReselected(tab: TabLayout.Tab) {
                 recycler.scrollToPosition(0)
             }
@@ -647,13 +651,20 @@ class ListActivity : AppCompatActivity() {
         searchView.queryHint = getString(R.string.search_hint)
         searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(q: String?): Boolean {
-                query = q.orEmpty(); applyFilterAndSort(); return true
+                applyQuery(q)
+                searchView.clearFocus() // collapse the keyboard once the search is committed
+                return true
             }
 
-            override fun onQueryTextChange(q: String?): Boolean {
-                query = q.orEmpty(); applyFilterAndSort(); return true
-            }
+            override fun onQueryTextChange(q: String?): Boolean = applyQuery(q)
         })
+        return true
+    }
+
+    /** Filters and re-sorts the list for [q], live as the user types and on submit. */
+    private fun applyQuery(q: String?): Boolean {
+        query = q.orEmpty()
+        applyFilterAndSort()
         return true
     }
 
