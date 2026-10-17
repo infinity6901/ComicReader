@@ -11,8 +11,8 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.infinity.comicreader.R
+import com.infinity.comicreader.util.AppDispatchers
 import com.google.android.material.appbar.MaterialToolbar
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -52,7 +52,7 @@ class CropActivity : AppCompatActivity() {
         val path = sourcePath ?: return
         progress.visibility = android.view.View.VISIBLE
         lifecycleScope.launch {
-            val decoded = withContext(Dispatchers.IO) { decodeCapped(path, 3000) }
+            val decoded = withContext(AppDispatchers.io) { decodeCapped(path, 3000) }
             progress.visibility = android.view.View.GONE
             if (decoded == null) {
                 toast(R.string.error_open)
@@ -77,7 +77,7 @@ class CropActivity : AppCompatActivity() {
         val rect: Rect = cropView.bitmapCropRect()
         progress.visibility = android.view.View.VISIBLE
         lifecycleScope.launch {
-            val out = withContext(Dispatchers.IO) { cropAndWrite(current, rect) }
+            val out = withContext(AppDispatchers.io) { cropAndWrite(current, rect) }
             progress.visibility = android.view.View.GONE
             if (out != null) {
                 toast(getString(R.string.crop_saved, out.absolutePath))

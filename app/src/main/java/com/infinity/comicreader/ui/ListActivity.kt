@@ -36,9 +36,9 @@ import com.infinity.comicreader.data.EntryType
 import com.infinity.comicreader.data.HistoryItem
 import com.infinity.comicreader.data.Library
 import com.infinity.comicreader.data.Prefs
+import com.infinity.comicreader.util.AppDispatchers
 import com.infinity.comicreader.util.Formats
 import com.infinity.comicreader.util.NaturalOrder
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -223,7 +223,7 @@ class ListActivity : AppCompatActivity() {
 
         showProgress(true)
         lifecycleScope.launch {
-            val list = withContext(Dispatchers.IO) { buildDirectoryEntries(dir) }
+            val list = withContext(AppDispatchers.io) { buildDirectoryEntries(dir) }
             progress.visibility = View.GONE
             displayEntries(list)
             if (highlight != null) scrollToHighlight(highlight)
@@ -269,7 +269,7 @@ class ListActivity : AppCompatActivity() {
         invalidateOptionsMenu()
         showProgress(true)
         lifecycleScope.launch {
-            val list = withContext(Dispatchers.IO) {
+            val list = withContext(AppDispatchers.io) {
                 library.favorites().map { entryFor(File(it)) }
             }
             progress.visibility = View.GONE
@@ -287,7 +287,7 @@ class ListActivity : AppCompatActivity() {
         invalidateOptionsMenu()
         showProgress(true)
         lifecycleScope.launch {
-            val list = withContext(Dispatchers.IO) { library.history().map { entryForHistory(it) } }
+            val list = withContext(AppDispatchers.io) { library.history().map { entryForHistory(it) } }
             progress.visibility = View.GONE
             displayEntries(list)
         }
@@ -303,7 +303,7 @@ class ListActivity : AppCompatActivity() {
         invalidateOptionsMenu()
         showProgress(true)
         lifecycleScope.launch {
-            val list = withContext(Dispatchers.IO) { library.bookmarks().map { entryForBookmark(it) } }
+            val list = withContext(AppDispatchers.io) { library.bookmarks().map { entryForBookmark(it) } }
             progress.visibility = View.GONE
             displayEntries(list)
         }

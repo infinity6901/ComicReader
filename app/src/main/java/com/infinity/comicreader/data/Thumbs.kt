@@ -20,6 +20,7 @@ import java.security.MessageDigest
 object Thumbs {
     private const val DISK_DIR = "thumbnails"
     private const val THUMB_CAP_PIXELS = 4_000_000L
+    private const val HEX_DIGITS = "0123456789abcdef"
 
     private val memory = object : LruCache<String, Bitmap>(maxBytes()) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
@@ -113,12 +114,21 @@ object Thumbs {
     }
 
     private fun diskFile(context: Context, key: String): File =
-        File(File(context.cacheDir, DISK_DIR), sha1(key) + ".jpg")
+        File(File(context.cacheDir, DISK_DIR), sha256(key) + ".jpg")
 
-    private fun sha1(value: String): String {
-        val bytes = MessageDigest.getInstance("SHA-1").digest(value.toByteArray())
-        val sb = StringBuilder(bytes.size * 2)
-        for (b in bytes) sb.append(String.format("%02x", b))
-        return sb.toString()
+    /**
+     * Cache-file name for [value]. This is only used to build a collision-resistant
+     * file name, but SHA-256 is used so the code does not rely on a weak hash
+     * (Sonar S4790) and the hex is built without a locale-sensitive formatter.
+     */
+    private fun sha256(value: String): String {
+        val bytes = MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8))
+        val hex = CharArray(bytes.size * 2)
+        for (i in bytes.indices) {
+            val b = bytes[i].toInt() and 0xFF
+            hex[i * 2] = HEX_DIGITS[b ushr 4]
+            hex[i * 2 + 1] = HEX_DIGITS[b and 0x0F]
+        }
+        return String(hex)
     }
 }

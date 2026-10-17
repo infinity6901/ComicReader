@@ -10,8 +10,8 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.infinity.comicreader.R
 import com.infinity.comicreader.reader.PageSource
+import com.infinity.comicreader.util.AppDispatchers
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -24,7 +24,7 @@ class ThumbAdapter(
     private val onPick: (Int) -> Unit
 ) : RecyclerView.Adapter<ThumbAdapter.Holder>() {
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val scope = CoroutineScope(SupervisorJob() + AppDispatchers.main)
     private val cache = object : LruCache<Int, Bitmap>(100) {}
 
     class Holder(val root: View, val image: com.google.android.material.imageview.ShapeableImageView, val label: TextView) :
@@ -60,7 +60,7 @@ class ThumbAdapter(
         }
         holder.image.setImageDrawable(null)
         scope.launch {
-            val bitmap = withContext(Dispatchers.IO) {
+            val bitmap = withContext(AppDispatchers.io) {
                 try {
                     source.loadPage(position, 240, 320)
                 } catch (t: Throwable) {

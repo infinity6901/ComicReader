@@ -12,8 +12,8 @@ import androidx.recyclerview.widget.RecyclerView
 import com.infinity.comicreader.R
 import com.infinity.comicreader.data.Prefs
 import com.infinity.comicreader.reader.PageSources
+import com.infinity.comicreader.util.AppDispatchers
 import com.google.android.material.appbar.MaterialToolbar
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -46,7 +46,7 @@ class PagesActivity : AppCompatActivity() {
 
         val prefs = Prefs(this)
         lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) {
+            val result = withContext(AppDispatchers.io) {
                 runCatching { PageSources.open(File(path), prefs.charset) }
             }
             progress.visibility = View.GONE

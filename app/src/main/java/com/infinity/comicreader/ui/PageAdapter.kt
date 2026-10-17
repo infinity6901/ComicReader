@@ -11,8 +11,8 @@ import android.widget.LinearLayout
 import androidx.recyclerview.widget.RecyclerView
 import com.infinity.comicreader.reader.Filters
 import com.infinity.comicreader.reader.PageSource
+import com.infinity.comicreader.util.AppDispatchers
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -64,7 +64,7 @@ class PageAdapter(
             notifyItemRangeChanged(0, itemCount)
         }
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val scope = CoroutineScope(SupervisorJob() + AppDispatchers.main)
     private val cache = object : LruCache<String, Bitmap>(6) {}
     private val aspects = HashMap<Int, Float>()
     private var learnedAspect = 1.45f
@@ -159,47 +159,61 @@ class PageAdapter(
             return
         }
         image.colorFilter = Filters.colorFilter(filter)
+        prepareContainer(holder, pageIndex)
 
+        val key = pageIndex.toString()
+        val cached = cache.get(key)
+        if (cached != null) {
+            applyBitmap(image, cached)
+            return
+        }
+        image.setImageDrawable(null)
+        loadPage(holder, image, pageIndex, key)
+    }
+
+    /** Applies the per-mode container geometry (long-strip height, or page spacing). */
+    private fun prepareContainer(holder: PageHolder, pageIndex: Int) {
         if (mode == Mode.LONG_STRIP) {
             applyHeight(holder.container, longStripHeight(pageIndex))
             holder.container.setPadding(0, 0, 0, 0)
         } else if (holder.container is FrameLayout) {
             holder.container.setPadding(spacingPx, spacingPx, spacingPx, spacingPx)
         }
+    }
 
-        val key = pageIndex.toString()
-        val cached = cache.get(key)
-        if (cached != null) {
-            image.setImageBitmap(cached)
-            image.setFitMode(fitMode)
-            return
-        }
-        image.setImageDrawable(null)
+    private fun applyBitmap(image: ZoomImageView, bitmap: Bitmap) {
+        image.setImageBitmap(bitmap)
+        image.setFitMode(fitMode)
+    }
 
+    private fun loadPage(holder: PageHolder, image: ZoomImageView, pageIndex: Int, key: String) {
         val (reqW, reqH) = requestSize(image)
         val holderPosition = holder.bindingAdapterPosition
         scope.launch {
-            val bitmap = withContext(Dispatchers.IO) {
-                try {
-                    source.loadPage(pageIndex, reqW, reqH)
-                } catch (t: Throwable) {
-                    Log.w(TAG, "Failed to load page $pageIndex", t)
-                    null
-                }
-            } ?: return@launch
+            val bitmap = withContext(AppDispatchers.io) { decode(pageIndex, reqW, reqH) }
+                ?: return@launch
 
             cache.put(key, bitmap)
             if (holder.bindingAdapterPosition != holderPosition) return@launch
-            image.setImageBitmap(bitmap)
-            image.setFitMode(fitMode)
-
-            if (mode == Mode.LONG_STRIP && bitmap.width > 0) {
-                val real = bitmap.height.toFloat() / bitmap.width.toFloat()
-                aspects[pageIndex] = real
-                if (pageIndex == 0) learnedAspect = real
-                applyHeight(holder.container, longStripHeight(pageIndex))
-            }
+            applyBitmap(image, bitmap)
+            updateLongStripAspect(holder, pageIndex, bitmap)
         }
+    }
+
+    private fun decode(pageIndex: Int, reqW: Int, reqH: Int): Bitmap? = try {
+        source.loadPage(pageIndex, reqW, reqH)
+    } catch (t: Throwable) {
+        Log.w(TAG, "Failed to load page $pageIndex", t)
+        null
+    }
+
+    /** Learns each page's real aspect ratio once its bitmap arrives, for long strips. */
+    private fun updateLongStripAspect(holder: PageHolder, pageIndex: Int, bitmap: Bitmap) {
+        if (mode != Mode.LONG_STRIP || bitmap.width <= 0) return
+        val real = bitmap.height.toFloat() / bitmap.width.toFloat()
+        aspects[pageIndex] = real
+        if (pageIndex == 0) learnedAspect = real
+        applyHeight(holder.container, longStripHeight(pageIndex))
     }
 
     private fun applyHeight(container: View, height: Int) {
@@ -231,7 +245,7 @@ class PageAdapter(
 
     private fun learnAspect() {
         scope.launch {
-            val size = withContext(Dispatchers.IO) {
+            val size = withContext(AppDispatchers.io) {
                 runCatching { source.pageSize(0) }.getOrNull()
             }
             if (size != null && size[0] > 0) {

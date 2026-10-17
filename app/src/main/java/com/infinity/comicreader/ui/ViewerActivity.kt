@@ -38,9 +38,9 @@ import com.infinity.comicreader.data.Prefs
 import com.infinity.comicreader.reader.Filters
 import com.infinity.comicreader.reader.PageSource
 import com.infinity.comicreader.reader.PageSources
+import com.infinity.comicreader.util.AppDispatchers
 import com.infinity.comicreader.util.Formats
 import com.infinity.comicreader.util.NaturalOrder
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -234,7 +234,7 @@ class ViewerActivity : AppCompatActivity() {
         progress.visibility = View.VISIBLE
 
         lifecycleScope.launch {
-            val (src, siblings) = withContext(Dispatchers.IO) {
+            val (src, siblings) = withContext(AppDispatchers.io) {
                 val s = runCatching { PageSources.open(file!!, prefs.charset) }.getOrNull()
                 s to siblingChapters(file!!)
             }
@@ -533,10 +533,30 @@ class ViewerActivity : AppCompatActivity() {
         nightOverlay.visibility = if (nightFilter) View.VISIBLE else View.GONE
     }
 
+    private fun setNight(enabled: Boolean) {
+        if (nightFilter == enabled) return
+        nightFilter = enabled
+        prefs.nightFilter = enabled
+        applyNight()
+        invalidateOptionsMenu()
+    }
+
+    private fun toggleNight() = setNight(!nightFilter)
+
     private fun applyKeepScreenOn() {
         if (keepOn) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
+
+    private fun setKeepOn(enabled: Boolean) {
+        if (keepOn == enabled) return
+        keepOn = enabled
+        prefs.keepScreenOn = enabled
+        applyKeepScreenOn()
+        invalidateOptionsMenu()
+    }
+
+    private fun toggleKeepOn() = setKeepOn(!keepOn)
 
     private fun setFullscreen(enabled: Boolean) {
         val controller = WindowInsetsControllerCompat(window, window.decorView)
@@ -622,56 +642,64 @@ class ViewerActivity : AppCompatActivity() {
         return super.onPrepareOptionsMenu(menu)
     }
 
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        when (item.itemId) {
-            R.id.menu_tune -> showReaderSheet()
-            R.id.menu_jump -> showJumpDialog()
-            R.id.menu_fit_screen -> setFit("screen")
-            R.id.menu_fit_width -> setFit("width")
-            R.id.menu_fit_height -> setFit("height")
-            R.id.menu_fit_stretch -> setFit("stretch")
-            R.id.menu_rotate -> cycleOrientation()
-            R.id.menu_bookmark -> toggleBookmark()
-            R.id.menu_bookmark_list -> showBookmarks()
-            R.id.menu_pages -> openPages()
-            R.id.menu_crop -> startCrop()
-            R.id.menu_two_page -> toggleTwoPage()
-            R.id.menu_dir_ltr -> setReadingDir("ltr")
-            R.id.menu_dir_rtl -> setReadingDir("rtl")
-            R.id.menu_mode_paged -> setPageMode(MODE_PAGED)
-            R.id.menu_mode_vertical -> setPageMode(MODE_VERTICAL)
-            R.id.menu_mode_longstrip -> setPageMode(MODE_LONGSTRIP)
-            R.id.menu_filter_none -> setFilter(Filters.NONE)
-            R.id.menu_filter_invert -> setFilter(Filters.INVERT)
-            R.id.menu_filter_grayscale -> setFilter(Filters.GRAYSCALE)
-            R.id.menu_filter_contrast -> setFilter(Filters.CONTRAST)
-            R.id.menu_filter_sepia -> setFilter(Filters.SEPIA)
-            R.id.menu_brightness -> showBrightnessDialog()
-            R.id.menu_page_spacing -> showSpacingDialog()
-            R.id.menu_prev_chapter -> openPrevChapter()
-            R.id.menu_next_chapter -> openNextChapter()
-            R.id.menu_orient_default ->
+    /**
+     * Menu items whose entire action is "assign a reader preference". They live in a
+     * lookup instead of being spelled out in [onOptionsItemSelected], which keeps that
+     * `when` comfortably under the branch limit enforced by static analysis.
+     */
+    private val valueMenus: Map<Int, () -> Unit> by lazy {
+        mapOf(
+            R.id.menu_fit_screen to { setFit("screen") },
+            R.id.menu_fit_width to { setFit("width") },
+            R.id.menu_fit_height to { setFit("height") },
+            R.id.menu_fit_stretch to { setFit("stretch") },
+            R.id.menu_filter_none to { setFilter(Filters.NONE) },
+            R.id.menu_filter_invert to { setFilter(Filters.INVERT) },
+            R.id.menu_filter_grayscale to { setFilter(Filters.GRAYSCALE) },
+            R.id.menu_filter_contrast to { setFilter(Filters.CONTRAST) },
+            R.id.menu_filter_sepia to { setFilter(Filters.SEPIA) },
+            R.id.menu_mode_paged to { setPageMode(MODE_PAGED) },
+            R.id.menu_mode_vertical to { setPageMode(MODE_VERTICAL) },
+            R.id.menu_mode_longstrip to { setPageMode(MODE_LONGSTRIP) },
+            R.id.menu_dir_ltr to { setReadingDir("ltr") },
+            R.id.menu_dir_rtl to { setReadingDir("rtl") },
+            R.id.menu_orient_default to {
                 requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-            R.id.menu_orient_portrait ->
+            },
+            R.id.menu_orient_portrait to {
                 requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-            R.id.menu_orient_landscape ->
+            },
+            R.id.menu_orient_landscape to {
                 requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-            R.id.menu_keep_on -> {
-                keepOn = !keepOn
-                prefs.keepScreenOn = keepOn
-                applyKeepScreenOn()
-                invalidateOptionsMenu()
             }
-            R.id.menu_night -> {
-                nightFilter = !nightFilter
-                prefs.nightFilter = nightFilter
-                applyNight()
-                invalidateOptionsMenu()
-            }
-            R.id.menu_fullscreen -> setFullscreen(!prefs.fullscreen)
-            else -> return super.onOptionsItemSelected(item)
+        )
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        val id = item.itemId
+        val assign = valueMenus[id]
+        if (assign != null) {
+            assign()
+            return true
         }
-        return true
+        return when (id) {
+            R.id.menu_tune -> { showReaderSheet(); true }
+            R.id.menu_jump -> { showJumpDialog(); true }
+            R.id.menu_rotate -> { cycleOrientation(); true }
+            R.id.menu_bookmark -> { toggleBookmark(); true }
+            R.id.menu_bookmark_list -> { showBookmarks(); true }
+            R.id.menu_pages -> { openPages(); true }
+            R.id.menu_crop -> { startCrop(); true }
+            R.id.menu_two_page -> { toggleTwoPage(); true }
+            R.id.menu_brightness -> { showBrightnessDialog(); true }
+            R.id.menu_page_spacing -> { showSpacingDialog(); true }
+            R.id.menu_prev_chapter -> { openPrevChapter(); true }
+            R.id.menu_next_chapter -> { openNextChapter(); true }
+            R.id.menu_keep_on -> { toggleKeepOn(); true }
+            R.id.menu_night -> { toggleNight(); true }
+            R.id.menu_fullscreen -> { setFullscreen(!prefs.fullscreen); true }
+            else -> super.onOptionsItemSelected(item)
+        }
     }
 
     // ------------------------------------------------------------------ reader options
@@ -733,13 +761,32 @@ class ViewerActivity : AppCompatActivity() {
         val dialog = BottomSheetDialog(this)
         dialog.setContentView(view)
 
-        val modeGroup = view.findViewById<MaterialButtonToggleGroup>(R.id.sheet_page_mode)
-        when (mode) {
-            MODE_VERTICAL -> modeGroup.check(R.id.btn_mode_vertical)
-            MODE_LONGSTRIP -> modeGroup.check(R.id.btn_mode_longstrip)
-            else -> modeGroup.check(R.id.btn_mode_paged)
+        bindModeSection(view)
+        bindFitSection(view)
+        bindFilterSection(view)
+        bindDirectionSection(view)
+        bindBrightnessSection(view)
+        bindSpacingSection(view)
+        bindToggleSection(view)
+
+        view.findViewById<View>(R.id.sheet_more_settings).setOnClickListener {
+            dialog.dismiss()
+            startActivity(Intent(this, SettingsActivity::class.java))
         }
-        modeGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+
+        dialog.show()
+    }
+
+    private fun bindModeSection(view: View) {
+        val group = view.findViewById<MaterialButtonToggleGroup>(R.id.sheet_page_mode)
+        group.check(
+            when (mode) {
+                MODE_VERTICAL -> R.id.btn_mode_vertical
+                MODE_LONGSTRIP -> R.id.btn_mode_longstrip
+                else -> R.id.btn_mode_paged
+            }
+        )
+        group.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked) return@addOnButtonCheckedListener
             when (checkedId) {
                 R.id.btn_mode_vertical -> setPageMode(MODE_VERTICAL)
@@ -747,15 +794,19 @@ class ViewerActivity : AppCompatActivity() {
                 R.id.btn_mode_paged -> setPageMode(MODE_PAGED)
             }
         }
+    }
 
-        val fitGroup = view.findViewById<ChipGroup>(R.id.sheet_fit)
-        when (effectiveFit()) {
-            ZoomImageView.FitMode.WIDTH -> fitGroup.check(R.id.chip_fit_width)
-            ZoomImageView.FitMode.HEIGHT -> fitGroup.check(R.id.chip_fit_height)
-            ZoomImageView.FitMode.STRETCH -> fitGroup.check(R.id.chip_fit_stretch)
-            else -> fitGroup.check(R.id.chip_fit_screen)
-        }
-        fitGroup.setOnCheckedStateChangeListener { _, checked ->
+    private fun bindFitSection(view: View) {
+        val group = view.findViewById<ChipGroup>(R.id.sheet_fit)
+        group.check(
+            when (effectiveFit()) {
+                ZoomImageView.FitMode.WIDTH -> R.id.chip_fit_width
+                ZoomImageView.FitMode.HEIGHT -> R.id.chip_fit_height
+                ZoomImageView.FitMode.STRETCH -> R.id.chip_fit_stretch
+                else -> R.id.chip_fit_screen
+            }
+        )
+        group.setOnCheckedStateChangeListener { _, checked ->
             when (checked.firstOrNull()) {
                 R.id.chip_fit_width -> setFit("width")
                 R.id.chip_fit_height -> setFit("height")
@@ -763,9 +814,11 @@ class ViewerActivity : AppCompatActivity() {
                 R.id.chip_fit_screen -> setFit("screen")
             }
         }
+    }
 
-        val filterGroup = view.findViewById<ChipGroup>(R.id.sheet_filter)
-        filterGroup.check(
+    private fun bindFilterSection(view: View) {
+        val group = view.findViewById<ChipGroup>(R.id.sheet_filter)
+        group.check(
             when (filter) {
                 Filters.INVERT -> R.id.chip_filter_invert
                 Filters.GRAYSCALE -> R.id.chip_filter_grayscale
@@ -773,7 +826,7 @@ class ViewerActivity : AppCompatActivity() {
                 else -> R.id.chip_filter_none
             }
         )
-        filterGroup.setOnCheckedStateChangeListener { _, checked ->
+        group.setOnCheckedStateChangeListener { _, checked ->
             when (checked.firstOrNull()) {
                 R.id.chip_filter_invert -> setFilter(Filters.INVERT)
                 R.id.chip_filter_grayscale -> setFilter(Filters.GRAYSCALE)
@@ -781,38 +834,50 @@ class ViewerActivity : AppCompatActivity() {
                 R.id.chip_filter_none -> setFilter(Filters.NONE)
             }
         }
+    }
 
-        val dirGroup = view.findViewById<ChipGroup>(R.id.sheet_dir)
-        dirGroup.check(if (readingDir == "rtl") R.id.chip_dir_rtl else R.id.chip_dir_ltr)
-        dirGroup.setOnCheckedStateChangeListener { _, checked ->
+    private fun bindDirectionSection(view: View) {
+        val group = view.findViewById<ChipGroup>(R.id.sheet_dir)
+        group.check(if (readingDir == "rtl") R.id.chip_dir_rtl else R.id.chip_dir_ltr)
+        group.setOnCheckedStateChangeListener { _, checked ->
             when (checked.firstOrNull()) {
                 R.id.chip_dir_rtl -> setReadingDir("rtl")
                 R.id.chip_dir_ltr -> setReadingDir("ltr")
             }
         }
+    }
 
-        val brightnessLabel = view.findViewById<TextView>(R.id.sheet_brightness_value)
-        val brightnessSlider = view.findViewById<Slider>(R.id.sheet_brightness)
-        brightnessLabel.text =
-            getString(R.string.menu_brightness) + " · " + getString(R.string.percent_format, brightness)
-        brightnessSlider.safeSet(brightness.toFloat())
-        brightnessSlider.addOnChangeListener { _, value, fromUser ->
+    private fun bindBrightnessSection(view: View) {
+        val label = view.findViewById<TextView>(R.id.sheet_brightness_value)
+        val slider = view.findViewById<Slider>(R.id.sheet_brightness)
+        label.text = brightnessLabel()
+        slider.safeSet(brightness.toFloat())
+        slider.addOnChangeListener { _, value, fromUser ->
             if (!fromUser) return@addOnChangeListener
             setBrightness(value.toInt())
-            brightnessLabel.text =
-                getString(R.string.menu_brightness) + " · " + getString(R.string.percent_format, brightness)
+            label.text = brightnessLabel()
         }
+    }
 
-        val spacingLabel = view.findViewById<TextView>(R.id.sheet_spacing_value)
-        val spacingSlider = view.findViewById<Slider>(R.id.sheet_spacing)
-        spacingLabel.text = getString(R.string.menu_page_spacing) + " · $spacingDp dp"
-        spacingSlider.safeSet(spacingDp.toFloat())
-        spacingSlider.addOnChangeListener { _, value, fromUser ->
+    private fun brightnessLabel(): String =
+        getString(R.string.menu_brightness) + " · " + getString(R.string.percent_format, brightness)
+
+    private fun bindSpacingSection(view: View) {
+        val label = view.findViewById<TextView>(R.id.sheet_spacing_value)
+        val slider = view.findViewById<Slider>(R.id.sheet_spacing)
+        label.text = spacingLabel()
+        slider.safeSet(spacingDp.toFloat())
+        slider.addOnChangeListener { _, value, fromUser ->
             if (!fromUser) return@addOnChangeListener
             setSpacingDp(value.toInt())
-            spacingLabel.text = getString(R.string.menu_page_spacing) + " · $spacingDp dp"
+            label.text = spacingLabel()
         }
+    }
 
+    private fun spacingLabel(): String =
+        getString(R.string.menu_page_spacing) + " · $spacingDp dp"
+
+    private fun bindToggleSection(view: View) {
         val twoPageSwitch = view.findViewById<MaterialSwitch>(R.id.sheet_two_page)
         twoPageSwitch.isChecked = twoPage
         twoPageSwitch.isEnabled = mode == MODE_PAGED
@@ -822,28 +887,11 @@ class ViewerActivity : AppCompatActivity() {
 
         val nightSwitch = view.findViewById<MaterialSwitch>(R.id.sheet_night)
         nightSwitch.isChecked = nightFilter
-        nightSwitch.setOnCheckedChangeListener { _, checked ->
-            nightFilter = checked
-            prefs.nightFilter = checked
-            applyNight()
-            invalidateOptionsMenu()
-        }
+        nightSwitch.setOnCheckedChangeListener { _, checked -> setNight(checked) }
 
         val keepSwitch = view.findViewById<MaterialSwitch>(R.id.sheet_keep_on)
         keepSwitch.isChecked = keepOn
-        keepSwitch.setOnCheckedChangeListener { _, checked ->
-            keepOn = checked
-            prefs.keepScreenOn = checked
-            applyKeepScreenOn()
-            invalidateOptionsMenu()
-        }
-
-        view.findViewById<View>(R.id.sheet_more_settings).setOnClickListener {
-            dialog.dismiss()
-            startActivity(Intent(this, SettingsActivity::class.java))
-        }
-
-        dialog.show()
+        keepSwitch.setOnCheckedChangeListener { _, checked -> setKeepOn(checked) }
     }
 
     /** Snaps a value onto the slider's step grid before assigning it. */
@@ -978,14 +1026,14 @@ class ViewerActivity : AppCompatActivity() {
         val page = currentIndex
         progress.visibility = View.VISIBLE
         lifecycleScope.launch {
-            val bitmap = withContext(Dispatchers.IO) {
+            val bitmap = withContext(AppDispatchers.io) {
                 try {
                     src.loadPage(page, 2400, 3200)
                 } catch (t: Throwable) {
                     null
                 }
             }
-            val outFile = if (bitmap == null) null else withContext(Dispatchers.IO) {
+            val outFile = if (bitmap == null) null else withContext(AppDispatchers.io) {
                 runCatching {
                     val out = File(cacheDir, "crop_src.png")
                     out.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }

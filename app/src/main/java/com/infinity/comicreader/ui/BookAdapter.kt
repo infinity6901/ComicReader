@@ -14,11 +14,11 @@ import com.infinity.comicreader.data.BookEntry
 import com.infinity.comicreader.data.EntryType
 import com.infinity.comicreader.data.Prefs
 import com.infinity.comicreader.data.Thumbs
+import com.infinity.comicreader.util.AppDispatchers
 import com.infinity.comicreader.util.FileUtils
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.imageview.ShapeableImageView
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -40,7 +40,7 @@ class BookAdapter(
 ) : RecyclerView.Adapter<BookAdapter.BookHolder>() {
 
     private val items = ArrayList<BookEntry>()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val scope = CoroutineScope(SupervisorJob() + AppDispatchers.main)
 
     /** Path to draw a focus ring around, used after "open file location". */
     var highlightPath: String? = null
@@ -112,7 +112,7 @@ class BookAdapter(
             }
             val target = position
             holder.job = scope.launch {
-                val bitmap = withContext(Dispatchers.IO) {
+                val bitmap = withContext(AppDispatchers.io) {
                     runCatching { Thumbs.load(appContext, item, charset, reqW, reqH) }.getOrNull()
                 }
                 if (bitmap != null && holder.bindingAdapterPosition == target) {
