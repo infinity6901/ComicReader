@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <PreferenceCategory app:title="@string/pref_cat_general">
         <ListPreference
@@ -90,12 +91,14 @@
             app:title="@string/pref_filter"
             app:useSimpleSummaryProvider="true" />
         <SeekBarPreference
+            android:max="100"
             app:defaultValue="100"
             app:key="pref_brightness"
             app:min="20"
             app:showSeekBarValue="true"
             app:title="@string/pref_brightness" />
         <SeekBarPreference
+            android:max="48"
             app:defaultValue="0"
             app:key="pref_page_spacing"
             app:min="0"
