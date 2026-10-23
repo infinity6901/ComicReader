@@ -1,6 +1,13 @@
 <resources>
     <string name="app_name">ComicReader</string>
     <string name="settings">Settings</string>
+    <string name="sheet_section_auto_scroll">Auto-scroll</string>
+    <string name="sheet_section_options">Layout and display</string>
+    <string name="sheet_section_controls">Controls</string>
+    <string name="sheet_section_actions">This chapter</string>
+    <string name="sheet_chapters">Chapters</string>
+    <string name="sheet_share">Share page</string>
+    <string name="sheet_save">Save page</string>
     <string name="about">About</string>
     <string name="about_version_format">%1$s %2$s</string>
 
@@ -212,6 +219,10 @@
     <string name="pref_volume_keys">Use volume keys to turn pages</string>
     <string name="pref_brightness_gesture">Swipe vertically to change brightness</string>
     <string name="pref_double_tap">Double-tap to zoom</string>
+    <string name="pref_chop_sensitivity">Chop sensitivity</string>
+    <string name="pref_chop_sensitivity_desc">Higher reacts to a lighter chop. Raise it if the exit does not trigger, lower it if it triggers by accident</string>
+    <string name="pref_chop_exit">Chop-chop to exit</string>
+    <string name="pref_chop_exit_desc">Give the phone a quick chop-chop motion to close the reader and leave the app instantly</string>
 
     <string name="pref_show_hidden">Show hidden files</string>
     <string name="pref_thumbs">Show page thumbnails</string>

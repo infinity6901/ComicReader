@@ -34,11 +34,13 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
+import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.slider.Slider
+import com.infinity.comicreader.util.ChopDetector
 import com.infinity.comicreader.R
 import com.infinity.comicreader.data.Bookmark
 import com.infinity.comicreader.data.HistoryItem
@@ -283,6 +285,38 @@ class ViewerActivity : AppCompatActivity() {
         sessionStart = SystemClock.elapsedRealtime()
     }
 
+    override fun onResume() {
+        super.onResume()
+        updateChopDetector()
+    }
+
+    override fun onPause() {
+        chopDetector?.stop()
+        super.onPause()
+    }
+
+    /** Listens for the chop-chop motion only while the reader is on screen and it is enabled. */
+    private fun updateChopDetector() {
+        if (!prefs.chopExit) {
+            chopDetector?.stop()
+            return
+        }
+        val detector = chopDetector ?: ChopDetector(this, { prefs.chopSensitivity }) { panicExit() }.also { chopDetector = it }
+        detector.start()
+    }
+
+    /**
+     * Quick exit: saves the place, then closes the whole task and drops it from the
+     * recent-apps list, so the phone lands on the home screen with nothing left behind.
+     */
+    private fun panicExit() {
+        if (isFinishing) return
+        stopAutoScroll()
+        saveHistory()
+        flushStats()
+        finishAndRemoveTask()
+    }
+
     override fun onStop() {
         super.onStop()
         stopAutoScroll()
@@ -292,6 +326,9 @@ class ViewerActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        sheetSync = null
+        chopDetector?.stop()
+        chopDetector = null
         stopAutoScroll()
         openJob?.cancel()
         closeSource()
@@ -480,7 +517,9 @@ class ViewerActivity : AppCompatActivity() {
             startAutoScroll()
         }
 
-        if (requested < 0 && prefs.askResume && saved in 1 until src.pageCount) {
+        if (requested < 0 && prefs.resume && prefs.askResume && saved in 1 until src.pageCount &&
+            !isFinishing && !isDestroyed
+        ) {
             askStartPage(saved, src.pageCount)
         }
     }
@@ -565,26 +604,28 @@ class ViewerActivity : AppCompatActivity() {
         if (stripAhead != null) return
         val next = nextChapter() ?: return
         stripAheadJob = lifecycleScope.launch {
-            val (src, ok) = withContext(AppDispatchers.io) {
-                val s = runCatching { PageSources.open(next, prefs.charset) }.getOrNull()
-                try {
-                    ensureActive()
-                } catch (e: CancellationException) {
-                    // A newer open replaced this one: do not leak the file handle.
-                    runCatching { s?.close() }
-                    throw e
+            // [opened] is written from inside the IO block, so the handle is still known
+            // here even when the coroutine is cancelled just as the block finishes (the
+            // block's return value would be lost then). Whatever is not adopted below is
+            // closed in the finally clause, on every exit path.
+            var opened: PageSource? = null
+            var adopted = false
+            try {
+                withContext(AppDispatchers.io) {
+                    opened = runCatching { PageSources.open(next, prefs.charset) }.getOrNull()
                 }
-                s to (s != null && s.pageCount > 0)
-            }
-            if (!ok || src == null) {
+                val src = opened
                 // Unreadable: the reader just falls back to stopping at the end.
-                runCatching { src?.close() }
-                return@launch
+                if (src == null || src.pageCount <= 0) return@launch
+                ensureActive()
+                stripAhead = src
+                stripAheadFile = next
+                adopted = true
+                // The mode or the setting may have changed while the archive was opening.
+                if (mode != MODE_PAGED && prefs.autoNext) adapter?.append(src)
+            } finally {
+                if (!adopted) runCatching { opened?.close() }
             }
-            stripAhead = src
-            stripAheadFile = next
-            // The mode or the setting may have changed while the archive was opening.
-            if (mode != MODE_PAGED && prefs.autoNext) adapter?.append(src)
         }
     }
 
@@ -624,7 +665,7 @@ class ViewerActivity : AppCompatActivity() {
         markedRead = false
         toolbar.title = chapterLabel(nextFile)
 
-        a.dropTo(boundary)
+        a.dropItemsBefore(boundary)
         lm?.scrollToPositionWithOffset((anchor - boundary).coerceAtLeast(0), top)
 
         seek.max = pageToItem((next.pageCount - 1).coerceAtLeast(0))
@@ -647,7 +688,7 @@ class ViewerActivity : AppCompatActivity() {
         // The adapter owns its segments: trimming the chapter out of the strip
         // lets it close the source once nothing is decoding from it anymore.
         val a = adapter
-        if (a != null) a.dropAfter(chapterPages()) else runCatching { ahead.close() }
+        if (a != null) a.dropAppended() else runCatching { ahead.close() }
         // Restores the end card, which the pending chapter may have suppressed.
         updateEndCard()
     }
@@ -1159,40 +1200,78 @@ class ViewerActivity : AppCompatActivity() {
         )
     }
 
+    // ------------------------------------------------------------------ reader bottom sheet
+
+    /** Re-reads the reader state into the open bottom sheet; null while no sheet is shown. */
+    private var sheetSync: (() -> Unit)? = null
+
+    /** True while the sheet's controls are being set from the state rather than by the user. */
+    private var sheetSyncing = false
+
+    private var chopDetector: ChopDetector? = null
+
+    /**
+     * Every state change calls invalidateOptionsMenu(), which refreshes the 3-dots menu. The
+     * open bottom sheet is refreshed from the same place, so a control whose value or
+     * availability depends on another one (two-page needs paged mode, auto-crop is off in
+     * long strip, auto-scroll stops at the end of a chapter) never shows stale state.
+     */
+    override fun invalidateOptionsMenu() {
+        super.invalidateOptionsMenu()
+        sheetSync?.invoke()
+    }
+
     private fun showReaderSheet() {
         val view = layoutInflater.inflate(R.layout.sheet_reader, null)
         val dialog = BottomSheetDialog(this)
         dialog.setContentView(view)
+        dialog.behavior.skipCollapsed = true
+        dialog.behavior.state = BottomSheetBehavior.STATE_EXPANDED
 
-        bindModeSection(view)
-        bindFitSection(view)
-        bindFilterSection(view)
-        bindDirectionSection(view)
+        val syncers = ArrayList<() -> Unit>()
+
+        bindModeSection(view, syncers)
+        bindFitSection(view, syncers)
+        bindFilterSection(view, syncers)
+        bindDirectionSection(view, syncers)
         bindBrightnessSection(view)
         bindSpacingSection(view)
-        bindAutoScrollSection(view)
-        bindOrientationSection(view)
-        bindToggleSection(view)
+        bindAutoScrollSection(view, dialog, syncers)
+        bindOrientationSection(view, syncers)
+        bindSwitchSection(view, syncers)
+        bindActionSection(view, dialog, syncers)
 
         view.findViewById<View>(R.id.sheet_more_settings).setOnClickListener {
             dialog.dismiss()
             startActivity(Intent(this, SettingsActivity::class.java))
         }
 
+        sheetSync = {
+            sheetSyncing = true
+            try {
+                syncers.forEach { it() }
+            } finally {
+                sheetSyncing = false
+            }
+        }
+        sheetSync?.invoke()
+        dialog.setOnDismissListener { sheetSync = null }
         dialog.show()
     }
 
-    private fun bindModeSection(view: View) {
+    private fun bindModeSection(view: View, syncers: MutableList<() -> Unit>) {
         val group = view.findViewById<MaterialButtonToggleGroup>(R.id.sheet_page_mode)
-        group.check(
-            when (mode) {
-                MODE_VERTICAL -> R.id.btn_mode_vertical
-                MODE_LONGSTRIP -> R.id.btn_mode_longstrip
-                else -> R.id.btn_mode_paged
-            }
-        )
+        syncers += {
+            group.check(
+                when (mode) {
+                    MODE_VERTICAL -> R.id.btn_mode_vertical
+                    MODE_LONGSTRIP -> R.id.btn_mode_longstrip
+                    else -> R.id.btn_mode_paged
+                }
+            )
+        }
         group.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (!isChecked) return@addOnButtonCheckedListener
+            if (!isChecked || sheetSyncing) return@addOnButtonCheckedListener
             when (checkedId) {
                 R.id.btn_mode_vertical -> setPageMode(MODE_VERTICAL)
                 R.id.btn_mode_longstrip -> setPageMode(MODE_LONGSTRIP)
@@ -1201,17 +1280,22 @@ class ViewerActivity : AppCompatActivity() {
         }
     }
 
-    private fun bindFitSection(view: View) {
+    private fun bindFitSection(view: View, syncers: MutableList<() -> Unit>) {
         val group = view.findViewById<ChipGroup>(R.id.sheet_fit)
-        group.check(
-            when (effectiveFit()) {
-                ZoomImageView.FitMode.WIDTH -> R.id.chip_fit_width
-                ZoomImageView.FitMode.HEIGHT -> R.id.chip_fit_height
-                ZoomImageView.FitMode.STRETCH -> R.id.chip_fit_stretch
-                else -> R.id.chip_fit_screen
-            }
-        )
+        syncers += {
+            group.check(
+                when (effectiveFit()) {
+                    ZoomImageView.FitMode.WIDTH -> R.id.chip_fit_width
+                    ZoomImageView.FitMode.HEIGHT -> R.id.chip_fit_height
+                    ZoomImageView.FitMode.STRETCH -> R.id.chip_fit_stretch
+                    else -> R.id.chip_fit_screen
+                }
+            )
+            // A continuous strip is always as wide as the screen, so fit has no meaning there.
+            for (i in 0 until group.childCount) group.getChildAt(i).isEnabled = mode != MODE_LONGSTRIP
+        }
         group.setOnCheckedStateChangeListener { _, checked ->
+            if (sheetSyncing) return@setOnCheckedStateChangeListener
             when (checked.firstOrNull()) {
                 R.id.chip_fit_width -> setFit("width")
                 R.id.chip_fit_height -> setFit("height")
@@ -1221,18 +1305,21 @@ class ViewerActivity : AppCompatActivity() {
         }
     }
 
-    private fun bindFilterSection(view: View) {
+    private fun bindFilterSection(view: View, syncers: MutableList<() -> Unit>) {
         val group = view.findViewById<ChipGroup>(R.id.sheet_filter)
-        group.check(
-            when (filter) {
-                Filters.INVERT -> R.id.chip_filter_invert
-                Filters.GRAYSCALE -> R.id.chip_filter_grayscale
-                Filters.CONTRAST -> R.id.chip_filter_contrast
-                Filters.SEPIA -> R.id.chip_filter_sepia
-                else -> R.id.chip_filter_none
-            }
-        )
+        syncers += {
+            group.check(
+                when (filter) {
+                    Filters.INVERT -> R.id.chip_filter_invert
+                    Filters.GRAYSCALE -> R.id.chip_filter_grayscale
+                    Filters.CONTRAST -> R.id.chip_filter_contrast
+                    Filters.SEPIA -> R.id.chip_filter_sepia
+                    else -> R.id.chip_filter_none
+                }
+            )
+        }
         group.setOnCheckedStateChangeListener { _, checked ->
+            if (sheetSyncing) return@setOnCheckedStateChangeListener
             when (checked.firstOrNull()) {
                 R.id.chip_filter_invert -> setFilter(Filters.INVERT)
                 R.id.chip_filter_grayscale -> setFilter(Filters.GRAYSCALE)
@@ -1243,10 +1330,11 @@ class ViewerActivity : AppCompatActivity() {
         }
     }
 
-    private fun bindDirectionSection(view: View) {
+    private fun bindDirectionSection(view: View, syncers: MutableList<() -> Unit>) {
         val group = view.findViewById<ChipGroup>(R.id.sheet_dir)
-        group.check(if (readingDir == "rtl") R.id.chip_dir_rtl else R.id.chip_dir_ltr)
+        syncers += { group.check(if (readingDir == "rtl") R.id.chip_dir_rtl else R.id.chip_dir_ltr) }
         group.setOnCheckedStateChangeListener { _, checked ->
+            if (sheetSyncing) return@setOnCheckedStateChangeListener
             when (checked.firstOrNull()) {
                 R.id.chip_dir_rtl -> setReadingDir("rtl")
                 R.id.chip_dir_ltr -> setReadingDir("ltr")
@@ -1284,78 +1372,112 @@ class ViewerActivity : AppCompatActivity() {
     private fun spacingLabel(): String =
         getString(R.string.menu_page_spacing) + " · $spacingDp dp"
 
-    private fun bindToggleSection(view: View) {
-        val twoPageSwitch = view.findViewById<MaterialSwitch>(R.id.sheet_two_page)
-        twoPageSwitch.isChecked = twoPage
-        twoPageSwitch.isEnabled = mode == MODE_PAGED
-        twoPageSwitch.setOnCheckedChangeListener { _, checked ->
-            if (checked != twoPage) toggleTwoPage()
-        }
-
-        val autoCropSwitch = view.findViewById<MaterialSwitch>(R.id.sheet_auto_crop)
-        autoCropSwitch.isChecked = autoCrop
-        autoCropSwitch.setOnCheckedChangeListener { _, checked ->
-            if (checked != autoCrop) setAutoCrop(checked)
-        }
-
-        val nightSwitch = view.findViewById<MaterialSwitch>(R.id.sheet_night)
-        nightSwitch.isChecked = nightFilter
-        nightSwitch.setOnCheckedChangeListener { _, checked -> setNight(checked) }
-
-        val keepSwitch = view.findViewById<MaterialSwitch>(R.id.sheet_keep_on)
-        keepSwitch.isChecked = keepOn
-        keepSwitch.setOnCheckedChangeListener { _, checked -> setKeepOn(checked) }
-
-        val fullscreenSwitch = view.findViewById<MaterialSwitch>(R.id.sheet_fullscreen)
-        fullscreenSwitch.isChecked = prefs.fullscreen
-        fullscreenSwitch.setOnCheckedChangeListener { _, checked -> setFullscreen(checked) }
-
-        val autoNextSwitch = view.findViewById<MaterialSwitch>(R.id.sheet_auto_next)
-        autoNextSwitch.isChecked = prefs.autoNext
-        autoNextSwitch.setOnCheckedChangeListener { _, checked -> setAutoNext(checked) }
-
-        val seriesSwitch = view.findViewById<MaterialSwitch>(R.id.sheet_series)
-        seriesSwitch.visibility = if (prefs.perSeries) View.VISIBLE else View.GONE
-        seriesSwitch.isChecked = seriesActive
-        seriesSwitch.setOnCheckedChangeListener { _, checked ->
-            if (checked != seriesActive) toggleSeries()
-        }
-    }
-
-    private fun bindAutoScrollSection(view: View) {
-        val autoSwitch = view.findViewById<MaterialSwitch>(R.id.sheet_auto_scroll)
+    private fun bindAutoScrollSection(view: View, dialog: BottomSheetDialog, syncers: MutableList<() -> Unit>) {
+        val toggle = view.findViewById<MaterialSwitch>(R.id.sheet_auto_scroll)
         val label = view.findViewById<TextView>(R.id.sheet_auto_speed_value)
         val slider = view.findViewById<Slider>(R.id.sheet_auto_speed)
 
-        autoSwitch.isChecked = autoScrolling
-        // Changing pages or chapters from the sheet must not leave the toggle stale.
-        autoSwitch.setOnCheckedChangeListener { _, checked ->
-            if (checked != autoScrolling) setAutoScroll(checked)
+        syncers += {
+            toggle.isChecked = autoScrolling
+            toggle.isEnabled = source != null
+            label.text = getString(R.string.auto_speed_value, prefs.autoSpeed)
+            slider.safeSet(prefs.autoSpeed.toFloat())
         }
-
-        label.text = autoSpeedLabel()
-        slider.safeSet(prefs.autoSpeed.toFloat())
+        toggle.setOnCheckedChangeListener { _, checked ->
+            // A change made by sync equals the current state, so only a real toggle gets through.
+            if (checked == autoScrolling) return@setOnCheckedChangeListener
+            toggleAutoScroll()
+            // Reading starts behind the sheet, so get it out of the way.
+            if (autoScrolling) dialog.dismiss()
+        }
         slider.addOnChangeListener { _, value, fromUser ->
-            if (!fromUser) return@addOnChangeListener
+            if (!fromUser || sheetSyncing) return@addOnChangeListener
             prefs.autoSpeed = value.toInt()
-            label.text = autoSpeedLabel()
+            label.text = getString(R.string.auto_speed_value, prefs.autoSpeed)
         }
     }
 
-    private fun autoSpeedLabel(): String =
-        getString(R.string.pref_auto_speed) + " · " +
-            getString(R.string.auto_speed_short, prefs.autoSpeed)
-
-    private fun bindOrientationSection(view: View) {
-        val group = view.findViewById<ChipGroup>(R.id.sheet_orientation)
-        group.check(
-            when (requestedOrientation) {
-                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT -> R.id.chip_orient_portrait
-                ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE -> R.id.chip_orient_landscape
-                else -> R.id.chip_orient_default
+    private fun bindSwitchSection(view: View, syncers: MutableList<() -> Unit>) {
+        /** Wires a switch whose user taps run [onToggle] only when they change [current]. */
+        fun bind(id: Int, current: () -> Boolean, enabled: () -> Boolean, onToggle: (Boolean) -> Unit) {
+            val sw = view.findViewById<MaterialSwitch>(id)
+            syncers += {
+                sw.isChecked = current()
+                sw.isEnabled = enabled()
             }
-        )
+            sw.setOnCheckedChangeListener { _, checked ->
+                if (sheetSyncing || checked == current()) return@setOnCheckedChangeListener
+                onToggle(checked)
+                // Some toggles refuse or only touch preferences: show what really happened.
+                sheetSync?.invoke()
+            }
+        }
+
+        bind(R.id.sheet_two_page, { twoPage }, { mode == MODE_PAGED }) { toggleTwoPage() }
+        bind(R.id.sheet_auto_crop, { autoCrop }, { mode != MODE_LONGSTRIP }) { toggleAutoCrop() }
+        bind(
+            R.id.sheet_series,
+            { seriesActive },
+            { prefs.perSeries && file?.parentFile != null }
+        ) { toggleSeries() }
+        bind(R.id.sheet_night, { nightFilter }, { true }) { setNight(it) }
+        bind(R.id.sheet_keep_on, { keepOn }, { true }) { setKeepOn(it) }
+        bind(R.id.sheet_fullscreen, { prefs.fullscreen }, { true }) { setFullscreen(it) }
+        bind(R.id.sheet_auto_next, { prefs.autoNext }, { true }) { setAutoNext(it) }
+        bind(R.id.sheet_tap_zones, { prefs.tapZones }, { true }) { prefs.tapZones = it }
+        bind(R.id.sheet_volume_keys, { prefs.volumeKeys }, { true }) { prefs.volumeKeys = it }
+        bind(R.id.sheet_chop_exit, { prefs.chopExit }, { true }) {
+            prefs.chopExit = it
+            updateChopDetector()
+        }
+        val chopLabel = view.findViewById<TextView>(R.id.sheet_chop_sensitivity_value)
+        val chopSlider = view.findViewById<Slider>(R.id.sheet_chop_sensitivity)
+        syncers += {
+            chopLabel.text = getString(R.string.pref_chop_sensitivity) + " · " +
+                getString(R.string.auto_speed_short, prefs.chopSensitivity)
+            chopSlider.safeSet(prefs.chopSensitivity.toFloat())
+            chopSlider.isEnabled = prefs.chopExit
+        }
+        chopSlider.addOnChangeListener { _, value, fromUser ->
+            if (!fromUser) return@addOnChangeListener
+            prefs.chopSensitivity = value.toInt()
+            chopLabel.text = getString(R.string.pref_chop_sensitivity) + " · " +
+                getString(R.string.auto_speed_short, prefs.chopSensitivity)
+        }
+        bind(R.id.sheet_double_tap, { prefs.doubleTapZoom }, { true }) {
+            prefs.doubleTapZoom = it
+            // The zoom gesture is wired into each page view when the adapter is created.
+            attach()
+        }
+    }
+
+    private fun bindActionSection(view: View, dialog: BottomSheetDialog, syncers: MutableList<() -> Unit>) {
+        val chapterButton = view.findViewById<View>(R.id.sheet_chapters)
+        val shareButton = view.findViewById<View>(R.id.sheet_share)
+        val saveButton = view.findViewById<View>(R.id.sheet_save)
+        syncers += {
+            chapterButton.isEnabled = chapters.size > 1
+            shareButton.isEnabled = source != null
+            saveButton.isEnabled = source != null
+        }
+        chapterButton.setOnClickListener { dialog.dismiss(); showChapterList() }
+        shareButton.setOnClickListener { dialog.dismiss(); exportPage(share = true) }
+        saveButton.setOnClickListener { dialog.dismiss(); exportPage(share = false) }
+    }
+
+    private fun bindOrientationSection(view: View, syncers: MutableList<() -> Unit>) {
+        val group = view.findViewById<ChipGroup>(R.id.sheet_orientation)
+        syncers += {
+            group.check(
+                when (requestedOrientation) {
+                    ActivityInfo.SCREEN_ORIENTATION_PORTRAIT -> R.id.chip_orient_portrait
+                    ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE -> R.id.chip_orient_landscape
+                    else -> R.id.chip_orient_default
+                }
+            )
+        }
         group.setOnCheckedStateChangeListener { _, checked ->
+            if (sheetSyncing) return@setOnCheckedStateChangeListener
             when (checked.firstOrNull()) {
                 R.id.chip_orient_portrait ->
                     setOrientationLock(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)

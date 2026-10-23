@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:maxHeight="560dp">
+    android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -82,6 +82,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_1"
             app:singleLine="false"
+            app:selectionRequired="true"
             app:singleSelection="true">
 
             <com.google.android.material.chip.Chip
@@ -127,6 +128,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_1"
+            app:selectionRequired="true"
             app:singleSelection="true">
 
             <com.google.android.material.chip.Chip
@@ -179,6 +181,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_1"
+            app:selectionRequired="true"
             app:singleSelection="true">
 
             <com.google.android.material.chip.Chip
@@ -237,11 +240,19 @@
             android:valueTo="48" />
 
         <!-- Auto-scroll -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_5"
+            android:text="@string/sheet_section_auto_scroll"
+            android:textAppearance="@style/TextAppearance.ComicReader.Label"
+            android:textColor="?attr/colorPrimary" />
+
         <com.google.android.material.materialswitch.MaterialSwitch
             android:id="@+id/sheet_auto_scroll"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_4"
+            android:layout_marginTop="@dimen/space_1"
             android:minHeight="48dp"
             android:text="@string/menu_auto_scroll" />
 
@@ -249,11 +260,8 @@
             android:id="@+id/sheet_auto_speed_value"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_3"
-            android:text="@string/pref_auto_speed"
             android:textAppearance="@style/TextAppearance.ComicReader.Label"
-            android:textColor="?attr/colorPrimary"
-            tools:text="Auto-scroll speed · 5 / 10" />
+            tools:text="Auto-scroll speed: 5 / 10" />
 
         <com.google.android.material.slider.Slider
             android:id="@+id/sheet_auto_speed"
@@ -268,7 +276,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_5"
+            android:layout_marginTop="@dimen/space_4"
             android:text="@string/menu_orientation"
             android:textAppearance="@style/TextAppearance.ComicReader.Label"
             android:textColor="?attr/colorPrimary" />
@@ -278,6 +286,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_1"
+            app:selectionRequired="true"
             app:singleSelection="true">
 
             <com.google.android.material.chip.Chip
@@ -302,12 +311,20 @@
                 android:text="@string/orientation_landscape" />
         </com.google.android.material.chip.ChipGroup>
 
-        <!-- Switches -->
+        <!-- Layout and display switches -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_4"
+            android:text="@string/sheet_section_options"
+            android:textAppearance="@style/TextAppearance.ComicReader.Label"
+            android:textColor="?attr/colorPrimary" />
+
         <com.google.android.material.materialswitch.MaterialSwitch
             android:id="@+id/sheet_two_page"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_4"
+            android:layout_marginTop="@dimen/space_1"
             android:minHeight="48dp"
             android:text="@string/menu_two_page" />
 
@@ -317,6 +334,13 @@
             android:layout_height="wrap_content"
             android:minHeight="48dp"
             android:text="@string/menu_auto_crop" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/sheet_series"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:text="@string/menu_remember_series" />
 
         <com.google.android.material.materialswitch.MaterialSwitch
             android:id="@+id/sheet_night"
@@ -346,12 +370,108 @@
             android:minHeight="48dp"
             android:text="@string/menu_auto_next" />
 
+        <!-- Controls -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_4"
+            android:text="@string/sheet_section_controls"
+            android:textAppearance="@style/TextAppearance.ComicReader.Label"
+            android:textColor="?attr/colorPrimary" />
+
         <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/sheet_series"
+            android:id="@+id/sheet_tap_zones"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_1"
+            android:minHeight="48dp"
+            android:text="@string/pref_tap_zones" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/sheet_volume_keys"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:minHeight="48dp"
-            android:text="@string/menu_remember_series" />
+            android:text="@string/pref_volume_keys" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/sheet_double_tap"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:text="@string/pref_double_tap" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/sheet_chop_exit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:text="@string/pref_chop_exit" />
+
+        <TextView
+            android:id="@+id/sheet_chop_sensitivity_value"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/pref_chop_sensitivity"
+            android:textAppearance="@style/TextAppearance.ComicReader.Label"
+            android:textColor="?attr/colorPrimary"
+            tools:text="Chop sensitivity · 5 / 10" />
+
+        <com.google.android.material.slider.Slider
+            android:id="@+id/sheet_chop_sensitivity"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:stepSize="1"
+            android:value="5"
+            android:valueFrom="1"
+            android:valueTo="10" />
+
+        <!-- Actions -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_4"
+            android:text="@string/sheet_section_actions"
+            android:textAppearance="@style/TextAppearance.ComicReader.Label"
+            android:textColor="?attr/colorPrimary" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_2"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/sheet_chapters"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="@dimen/space_1"
+                android:layout_weight="1"
+                android:text="@string/sheet_chapters"
+                android:textSize="12sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/sheet_share"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/space_1"
+                android:layout_marginEnd="@dimen/space_1"
+                android:layout_weight="1"
+                android:text="@string/sheet_share"
+                android:textSize="12sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/sheet_save"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/space_1"
+                android:layout_weight="1"
+                android:text="@string/sheet_save"
+                android:textSize="12sp" />
+        </LinearLayout>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/sheet_more_settings"

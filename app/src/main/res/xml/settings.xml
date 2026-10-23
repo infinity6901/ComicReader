@@ -158,6 +158,20 @@
             app:defaultValue="true"
             app:key="pref_double_tap"
             app:title="@string/pref_double_tap" />
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:key="pref_chop_exit"
+            app:summary="@string/pref_chop_exit_desc"
+            app:title="@string/pref_chop_exit" />
+        <SeekBarPreference
+            android:max="10"
+            app:defaultValue="5"
+            app:dependency="pref_chop_exit"
+            app:key="pref_chop_sensitivity"
+            app:min="1"
+            app:showSeekBarValue="true"
+            app:summary="@string/pref_chop_sensitivity_desc"
+            app:title="@string/pref_chop_sensitivity" />
     </PreferenceCategory>
 
     <PreferenceCategory app:title="@string/pref_cat_list">

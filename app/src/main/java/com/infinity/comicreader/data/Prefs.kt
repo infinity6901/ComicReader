@@ -138,6 +138,16 @@ class Prefs(context: Context) {
         get() = bool(KEY_BRIGHTNESS_GESTURE, true)
         set(v) = put(KEY_BRIGHTNESS_GESTURE, v)
 
+    /** Quick-exit: a chop-chop motion closes the reader and leaves the app at once. */
+    var chopExit: Boolean
+        get() = bool(KEY_CHOP_EXIT, false)
+        set(v) = put(KEY_CHOP_EXIT, v)
+
+    /** 1 (needs a hard, fast chop) .. 10 (reacts to a light one); phones differ, so it is adjustable. */
+    var chopSensitivity: Int
+        get() = integer(KEY_CHOP_SENSITIVITY, 5).coerceIn(1, 10)
+        set(v) = put(KEY_CHOP_SENSITIVITY, v.coerceIn(1, 10))
+
     var doubleTapZoom: Boolean
         get() = bool(KEY_DOUBLE_TAP, true)
         set(v) = put(KEY_DOUBLE_TAP, v)
@@ -253,6 +263,8 @@ class Prefs(context: Context) {
         private const val KEY_VOLUME_KEYS = "pref_volume_keys"
         private const val KEY_BRIGHTNESS_GESTURE = "pref_brightness_gesture"
         private const val KEY_DOUBLE_TAP = "pref_double_tap"
+        private const val KEY_CHOP_EXIT = "pref_chop_exit"
+        private const val KEY_CHOP_SENSITIVITY = "pref_chop_sensitivity"
         private const val KEY_SHOW_HIDDEN = "pref_show_hidden"
         private const val KEY_THUMBS = "pref_thumbs"
         private const val KEY_GRID = "pref_grid"
@@ -272,7 +284,7 @@ class Prefs(context: Context) {
             KEY_THEME, KEY_LOCALE, KEY_CHARSET, KEY_FULLSCREEN, KEY_KEEP_ON, KEY_READING_DIR,
             KEY_PAGE_MODE, KEY_FIT, KEY_FILTER, KEY_BRIGHTNESS, KEY_SPACING, KEY_AUTO_NEXT,
             KEY_RESUME, KEY_ASK_RESUME, KEY_TWO_PAGE, KEY_NIGHT, KEY_TAP_ZONES, KEY_VOLUME_KEYS,
-            KEY_BRIGHTNESS_GESTURE, KEY_DOUBLE_TAP, KEY_SHOW_HIDDEN, KEY_THUMBS, KEY_GRID,
+            KEY_BRIGHTNESS_GESTURE, KEY_DOUBLE_TAP, KEY_CHOP_EXIT, KEY_CHOP_SENSITIVITY, KEY_SHOW_HIDDEN, KEY_THUMBS, KEY_GRID,
             KEY_COLUMNS, KEY_SORT, KEY_SORT_DIR, KEY_FILENAMES, KEY_PATHVIEW, KEY_LIST_STATUSBAR,
             KEY_QUICK_FAB, KEY_AUTO_CROP, KEY_PRELOAD, KEY_AUTO_SPEED, KEY_PER_SERIES
         )

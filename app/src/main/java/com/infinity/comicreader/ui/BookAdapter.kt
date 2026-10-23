@@ -61,8 +61,13 @@ class BookAdapter(
     /** A header occupies position 0, so every entry shifts down by this much. */
     var header: Header? = null
         set(value) {
-            if (field == value) return
+            val old = field
             field = value
+            // A fresh onClick lambda is built on every refresh; only a visible change
+            // (row added, removed or re-labelled) needs the list rebuilt.
+            val same = old != null && value != null && old.title == value.title &&
+                old.subtitle == value.subtitle && old.iconRes == value.iconRes
+            if (old == null && value == null || same) return
             notifyDataSetChanged()
         }
 

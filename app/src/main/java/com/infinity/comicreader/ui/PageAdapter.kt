@@ -259,6 +259,15 @@ class PageAdapter(
         notifyItemRangeRemoved(0, removed)
     }
 
+    /** [dropTo] for an item index of the strip as currently laid out (0 = first item). */
+    fun dropItemsBefore(item: Int) = dropTo(base + item)
+
+    /** Removes every appended chapter, leaving only the first one still in the strip. */
+    fun dropAppended() {
+        if (segments.size < 2) return
+        dropAfter(segments[1].first)
+    }
+
     /**
      * Undoes an append: throws away every chapter starting at [first] (used when
      * "auto next chapter" is switched off again mid-chapter). Main thread only.
@@ -484,9 +493,9 @@ class PageAdapter(
         scope.cancel()
         pending.clear()
         cache.evictAll()
-        // Every chapter's handle is released here rather than earlier, so a decode
-        // still in flight cannot meet a closed archive.
-        segments.forEach { retire(it) }
+        // The reader owns the sources still in the strip and re-lays them into the next
+        // adapter it builds (every layout change makes a new one), so nothing is closed
+        // here: only chapters trimmed off by dropTo/dropAfter are closed by the adapter.
         segments.clear()
         base = 0
     }
