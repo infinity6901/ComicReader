@@ -1,14 +1,12 @@
 name: Build ComicReader
 
-# Lives on your `custom` branch too: <your-fork>/.github/workflows/build-comicreader.yml
-# Run it from the Actions tab ("Run workflow"), or it runs on every push to main/custom.
 on:
   workflow_dispatch:
   push:
     branches: [main, custom]
 
 permissions:
-  contents: write # needed to publish the APK as a GitHub Release
+  contents: write
 
 concurrency:
   group: build-comicreader
@@ -34,6 +32,9 @@ jobs:
         with:
           cache-disabled: true
 
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
       - name: Decode signing keystore
         env:
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
@@ -47,18 +48,19 @@ jobs:
               "${{ runner.temp }}" "$KEY_STORE_PASSWORD" "$ALIAS" "$KEY_PASSWORD" > keystore.properties
           fi
 
-      - name: Make gradlew executable
-        run: chmod +x gradlew
-
       - name: Build
         run: ./gradlew assembleDebug assembleRelease --console=plain
 
       - name: Rename APKs
         run: |
           set -e
-          VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
-          mv app/build/outputs/apk/debug/app-debug.apk "ComicReader-${VERSION}-debug.apk"
-          mv app/build/outputs/apk/release/app-release.apk "ComicReader-${VERSION}-foss-release.apk"
+          VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts | head -1)
+          DEBUG_SRC=$(find app/build/outputs/apk/debug -type f -name '*.apk' | head -1)
+          RELEASE_SRC=$(find app/build/outputs/apk/release -type f -name '*.apk' | head -1)
+          [ -n "$DEBUG_SRC" ] && [ -f "$DEBUG_SRC" ]
+          [ -n "$RELEASE_SRC" ] && [ -f "$RELEASE_SRC" ]
+          mv "$DEBUG_SRC" "ComicReader-${VERSION}-debug.apk"
+          mv "$RELEASE_SRC" "ComicReader-${VERSION}-foss-release.apk"
           echo "DEBUG_APK=ComicReader-${VERSION}-debug.apk" >> "$GITHUB_ENV"
           echo "RELEASE_APK=ComicReader-${VERSION}-foss-release.apk" >> "$GITHUB_ENV"
           echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
