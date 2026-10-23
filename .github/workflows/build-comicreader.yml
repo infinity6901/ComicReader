@@ -1,0 +1,69 @@
+name: Build ComicReader
+
+# Lives on your `custom` branch too: <your-fork>/.github/workflows/build-comicreader.yml
+# Run it from the Actions tab ("Run workflow"), or it runs on every push to main/custom.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, custom]
+
+permissions:
+  contents: write # needed to publish the APK as a GitHub Release
+
+concurrency:
+  group: build-comicreader
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and publish APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-disabled: true
+
+      - name: Decode signing keystore
+        if: ${{ secrets.SIGNING_KEY != '' }}
+        run: |
+          echo "$SIGNING_KEY" | base64 -d > "${{ runner.temp }}/comicreader.keystore"
+          cat > keystore.properties <<EOF
+          storeFile=${{ runner.temp }}/comicreader.keystore
+          storePassword=${{ secrets.KEY_STORE_PASSWORD }}
+          keyAlias=${{ secrets.ALIAS }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          EOF
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+
+      - name: Build
+        run: ./gradlew assembleDebug assembleRelease --console=plain
+
+      - name: Rename APKs
+        run: |
+          set -e
+          VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          mv app/build/outputs/apk/debug/app-debug.apk "ComicReader-${VERSION}-debug.apk"
+          mv app/build/outputs/apk/release/app-release.apk "ComicReader-${VERSION}-foss-release.apk"
+          echo "DEBUG_APK=ComicReader-${VERSION}-debug.apk" >> "$GITHUB_ENV"
+          echo "RELEASE_APK=ComicReader-${VERSION}-foss-release.apk" >> "$GITHUB_ENV"
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+
+      - name: Publish release
+        run: |
+          gh release create "v${VERSION}-r${{ github.run_number }}" "$DEBUG_APK" "$RELEASE_APK" \
+            --title "ComicReader ${VERSION} (r${{ github.run_number }})" \
+            --notes "Automated build from commit ${{ github.sha }}."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
