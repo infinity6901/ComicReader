@@ -47,6 +47,9 @@ jobs:
               "${{ runner.temp }}" "$KEY_STORE_PASSWORD" "$ALIAS" "$KEY_PASSWORD" > keystore.properties
           fi
 
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
       - name: Build
         run: ./gradlew assembleDebug assembleRelease --console=plain
 
