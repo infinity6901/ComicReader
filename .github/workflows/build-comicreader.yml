@@ -35,17 +35,17 @@ jobs:
           cache-disabled: true
 
       - name: Decode signing keystore
-        if: ${{ secrets.SIGNING_KEY != '' }}
-        run: |
-          echo "$SIGNING_KEY" | base64 -d > "${{ runner.temp }}/comicreader.keystore"
-          cat > keystore.properties <<EOF
-          storeFile=${{ runner.temp }}/comicreader.keystore
-          storePassword=${{ secrets.KEY_STORE_PASSWORD }}
-          keyAlias=${{ secrets.ALIAS }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          EOF
         env:
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          ALIAS: ${{ secrets.ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "$SIGNING_KEY" ]; then
+            echo "$SIGNING_KEY" | base64 -d > "${{ runner.temp }}/comicreader.keystore"
+            printf 'storeFile=%s/comicreader.keystore\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+              "${{ runner.temp }}" "$KEY_STORE_PASSWORD" "$ALIAS" "$KEY_PASSWORD" > keystore.properties
+          fi
 
       - name: Build
         run: ./gradlew assembleDebug assembleRelease --console=plain
